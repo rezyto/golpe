@@ -173,6 +173,8 @@ func autotest() -> void:
 	await tr.create_timer(0.3).timeout
 	print("autotest: dentro ", inside, " contentores ", I.get("conts", []).size())
 	for c in I["conts"]:
+		P["x"] = c["x"] + c["w"] / 2.0
+		P["y"] = c["y"] + c["h"] + 0.6
 		start_search(c)
 		search["t"] = 999.0
 		await tr.process_frame
