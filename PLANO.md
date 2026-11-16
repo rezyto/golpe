@@ -65,3 +65,20 @@ REGRA: nada copiado (mapa, itens, personagens, arte, sons, UI). Só mecânicas g
 ## Próximos passos pedidos pelo utilizador (por prioridade)
 - Qualidade visual: modelos 3D a sério (personagens animados, carros) → packs CC0 (Quaternius/Kenney/KayKit) descarregados no CI.
 - Mais funcionalidades dentro dos edifícios; menus com ar profissional; polícia jogável/multijogador mais tarde.
+
+## PLANO v0.4 (pedido 16/11, ordem de execução)
+Revisão visual: o CI tira capturas (ramo `capturas`) → Claude vê e corrige. Problemas vistos: paredes do interior tapam a câmara,
+móveis = caixas, janela de saque vazia e com texto, bússola/nome da zona por cima de letreiros, botão de ação "—" inútil, demasiado texto no arranque.
+1. UI limpa: arranque = logo + barra; login = logo + nome + JOGAR; HUD sem textos redundantes; ação só aparece quando há ação.
+2. Itens a sério: catálogo ITEMS (id, nome, categoria, kg, valor, ícone PNG próprio). DINHEIRO É UM ITEM (maços de notas no saco).
+   Cofre do esconderijo guarda dinheiro em segurança; detido/hospital = perdes o saco (incluindo dinheiro). Compras pagam com o saco e depois o cofre.
+   Inventário e saque em grelha de ícones (quantidade + valor), sem "redação".
+3. Interiores com mobília KayKit (Furniture + Restaurant, CC0), paredes em corte (a do lado da câmara é baixa), sala dos fundos trancada.
+   Lojas: café, bomba, farmácia, garrafeira, hotel, joalharia, museu, banco.
+4. Mini-tarefas: funcionário (ameaçar com a arma / amarrar com abraçadeiras, senão liga à polícia), câmaras (destruir a tiro ou usar máscara,
+   senão +1 estrela à saída), porta dos fundos (arrombar: pé-de-cabra rápido, gazuas silenciosas), cofres (precisam de berbequim).
+5. Carrinhas de receptação (3 ativas na cidade, rodam a cada 10 min, cada uma paga mais por uma categoria): vender → dinheiro vai para a mesa
+   → recolher maço a maço → risco de rivais (tentam levar o dinheiro) e patrulha.
+6. Bar O Farol = HISTÓRIA (já não compra saque): Cap.1 "A fotografia" (encontrar foto no cofre do hotel) → desbloqueia joalharia + gazuas;
+   Cap.2 "A dívida" (pagar $1 000 000) → desbloqueia banco + saco XL; Cap.3 "O livro de contas" (roubar do banco) → contratos de elite. Contratos continuam.
+7. Economia ×10 (para $1 000 000 fazer sentido). Saves antigos são reiniciados (protótipo).

@@ -107,6 +107,16 @@ var mat_cache = {}
 var fac_cache = {}
 var save_t = 0.0
 var reset_arm = 0.0
+var vans = []
+var icon_cache = {}
+var loot_mode = "loot"
+var inv_sel = -1
+var sell_van = {}
+var loot_btn: Button
+var bag_title: Label
+var loot_detail: Label
+var loot_use: Button
+var loot_drop: Button
 
 
 # =====================================================================
@@ -140,23 +150,33 @@ func shot(name: String) -> void:
 	print("shot ", name)
 
 
+func test_save() -> void:
+	S = default_save()
+	S["nick"] = "Teste"
+	S["lvl"] = 6
+	S["money"] = 400000
+	S["story"] = 2
+	S["weapons"] = ["p22", "p9", "smg"]
+	S["tools"] = ["berbequim", "pe_cabra"]
+	S["ties"] = 5
+	login_ui.visible = false
+	hud.visible = true
+
+
 func shots() -> void:
 	var tr = get_tree()
 	await tr.create_timer(0.5).timeout
 	await shot("01_login")
-	S = default_save()
-	S["nick"] = "Teste"
-	S["lvl"] = 6
-	S["money"] = 25000
-	S["weapons"] = ["p22", "p9", "smg"]
-	login_ui.visible = false
-	hud.visible = true
+	test_save()
 	enter_place("home")
 	await tr.create_timer(1.5).timeout
 	await shot("02_casa")
+	open_shop("home")
+	await shot("03_cofre")
+	close_menu()
 	open_region()
 	_region_select("city")
-	await shot("03_regiao")
+	await shot("04_regiao")
 	region_ui.visible = false
 	enter_place("city")
 	await tr.create_timer(1.0).timeout
@@ -164,60 +184,230 @@ func shots() -> void:
 		car["spd"] = 12.0
 		await tr.process_frame
 	await tr.create_timer(0.8).timeout
-	await shot("04_cidade_carro")
-	var cafe = find_poi("cafe")
-	exit_car()
-	P["x"] = cafe["x"] + 3.0
-	P["y"] = cafe["y"] + 6.0
-	P["ang"] = -PI / 2
-	cam_yaw = 0.3
-	snap_cam = true
-	await tr.create_timer(1.0).timeout
-	await shot("05_rua_a_pe")
-	cam_yaw = PI * 0.8
-	snap_cam = true
-	await tr.create_timer(0.6).timeout
-	await shot("06_rua_outro_lado")
+	await shot("05_cidade_carro")
 	open_fullmap()
-	await shot("07_mapa_cidade")
+	await shot("06_mapa_cidade")
 	close_fullmap()
-	for hid in ["cafe", "bomba", "hotel", "museu"]:
+	exit_car()
+	for hid in ["cafe", "bomba", "farmacia", "garrafeira", "hotel", "joalharia", "museu", "banco"]:
 		var p = find_poi(hid)
 		if p.is_empty():
+			print("falta poi ", hid)
 			continue
 		P["x"] = p["x"]
 		P["y"] = p["y"] + 1.0
-		enter_interior(p)
-		wanted = 0
-		await tr.create_timer(0.8).timeout
-		await shot("08_interior_" + hid)
 		if hid == "cafe":
-			var c = I["conts"][0]
-			P["x"] = c["x"] + c["w"] / 2.0
-			P["y"] = c["y"] + c["h"] + 0.6
-			start_search(c)
+			P["y"] = p["y"] + 5.0
+			P["ang"] = -PI / 2
+			cam_yaw = 0.25
+			snap_cam = true
+			await tr.create_timer(0.8).timeout
+			await shot("07_rua_a_pe")
+			P["y"] = p["y"] + 1.0
+		enter_interior(p)
+		await tr.create_timer(0.8).timeout
+		await shot("10_interior_" + hid)
+		if hid == "cafe":
+			P["y"] = 7.4
+			P["x"] = 9.3
 			await tr.create_timer(0.6).timeout
-			await shot("09_a_vasculhar")
-			search["t"] = 999.0
+			await shot("11_cafe_balcao")
+			threaten_clerk()
+			var c = I["conts"][0]
+			start_search(c)
+			await tr.create_timer(0.5).timeout
+			await shot("12_a_vasculhar")
+			if not search.is_empty():
+				search["t"] = 999.0
 			await tr.create_timer(0.3).timeout
-			await shot("10_janela_saque")
+			await shot("13_janela_saque")
+			_loot_take_all()
 			close_loot()
+			add_stack({"id": "relogio", "q": 2})
+			add_stack({"id": "portatil", "q": 1})
+			add_stack({"id": "whisky", "q": 3})
+			add_stack({"id": "kit_medico", "q": 1})
+			open_inventory()
+			_inv_select(1)
+			await shot("14_inventario")
+			close_loot()
+			start_door()
+			if not search.is_empty():
+				search["t"] = 999.0
+			P["x"] = I["bdoor"]["x"]
+			P["y"] = I["bdoor"]["y"] + 1.0
+			await tr.create_timer(0.4).timeout
+			P["y"] = 1.8
+			P["x"] = 8.0
+			await tr.create_timer(0.6).timeout
+			await shot("15_sala_dos_fundos")
+		I["searched"] = 0
 		exit_interior()
 		wanted = 0
 	open_shop("armeiro")
-	await shot("11_loja_armeiro")
+	await shot("20_armeiro")
 	close_menu()
+	if vans.size() > 0:
+		var v = vans[0]
+		P["x"] = v["nx"] + 1.5
+		P["y"] = v["ny"] + (4.0 if v["ny"] > v["y"] else -4.0)
+		cam_yaw = 0.0 if v["ny"] > v["y"] else PI
+		snap_cam = true
+		await tr.create_timer(1.0).timeout
+		await shot("21_carrinha")
+		P["x"] = v["nx"]
+		P["y"] = v["ny"]
+		open_sell(v)
+		await shot("22_vender")
+		_sell_all()
+		close_loot()
+		await tr.create_timer(0.3).timeout
+		await shot("23_dinheiro_na_mesa")
+	enter_place("bar")
+	await tr.create_timer(0.8).timeout
+	open_shop("bar")
+	await shot("24_bar_historia")
+	close_menu()
+	enter_place("city")
+	exit_car()
 	var tv = find_poi("t_velho")
 	P["x"] = tv["x"] - 14.0
 	P["y"] = tv["y"] + 4.0
 	cam_yaw = -PI / 2
 	snap_cam = true
 	await tr.create_timer(1.5).timeout
-	await shot("12_territorio_gangue")
+	await shot("25_territorio")
 	wanted = 3
 	await tr.create_timer(5.0).timeout
-	await shot("13_policia")
+	await shot("26_policia")
 	print("SHOTS OK")
+	tr.quit()
+
+
+func autotest() -> void:
+	## Teste automático no CI: percorre os sistemas e falha se houver erros de script.
+	var tr = get_tree()
+	test_save()
+	S["story"] = 0
+	enter_place("home")
+	await tr.create_timer(0.4).timeout
+	for id in ["home", "armeiro", "stand", "imob", "bar"]:
+		open_shop(id)
+		await tr.process_frame
+		close_menu()
+	open_inventory()
+	await tr.process_frame
+	close_loot()
+	menu_options()
+	await tr.process_frame
+	close_menu()
+	open_region()
+	await tr.process_frame
+	_region_select("city")
+	_region_go()
+	await tr.create_timer(1.0).timeout
+	print("autotest: cidade pois ", Z["pois"].size(), " carrinhas ", vans.size(), " civ ", civ.size(), " peoes ", peds.size())
+	open_fullmap()
+	await tr.process_frame
+	_fullmap_pick("museu")
+	close_fullmap()
+	exit_car()
+	print("autotest: joalharia bloqueada = ", heist_locked("joalharia"))
+	for hid in ["cafe", "hotel"]:
+		var p = find_poi(hid)
+		P["x"] = p["x"]
+		P["y"] = p["y"] + 1.0
+		await tr.process_frame
+		do_action()
+		await tr.create_timer(0.3).timeout
+		P["x"] = I["clerk"]["x"]
+		P["y"] = I["clerk"]["y"] + 2.4
+		await tr.process_frame
+		do_action()
+		await tr.process_frame
+		do_action()
+		print("autotest: ", hid, " funcionario ", I["clerk"]["state"])
+		start_door()
+		search["t"] = 999.0
+		P["x"] = I["bdoor"]["x"]
+		P["y"] = I["bdoor"]["y"] + 1.0
+		await tr.process_frame
+		await tr.process_frame
+		for c in I["conts"]:
+			P["x"] = c["x"] + c["w"] / 2.0
+			P["y"] = c["y"] + c["h"] + 0.6
+			start_search(c)
+			search["t"] = 999.0
+			await tr.process_frame
+			await tr.process_frame
+			_loot_take_all()
+			close_loot()
+		firing = true
+		await tr.create_timer(0.4).timeout
+		firing = false
+		print("autotest: ", hid, " saco ", S["inv"].size(), " valor ", inv_value(), " foto ", count_item("foto"), " porta ", I["bdoor"]["open"])
+		P["x"] = I["w"] / 2.0
+		P["y"] = I["d"] + 1.0
+		await tr.create_timer(0.3).timeout
+		print("autotest: saiu ", not inside, " wanted ", wanted)
+		wanted = 0
+	var v = vans[0]
+	P["x"] = v["nx"]
+	P["y"] = v["ny"]
+	await tr.process_frame
+	do_action()
+	await tr.process_frame
+	_sell_all()
+	close_loot()
+	print("autotest: mesa ", v["table"])
+	P["x"] = v["tx"]
+	P["y"] = v["ty"] + 1.4
+	await tr.process_frame
+	do_action()
+	if not search.is_empty():
+		search["t"] = 999.0
+	await tr.process_frame
+	await tr.process_frame
+	print("autotest: dinheiro no saco ", bag_cash(), " mesa ", v["table"])
+	v["table"] = 5000
+	v["risk"] = 0.1
+	await tr.create_timer(0.5).timeout
+	wanted = 4
+	await tr.create_timer(3.0).timeout
+	print("autotest: policia ", police.size(), " rivais ", gang.size())
+	wanted = 0
+	for g in gang:
+		g["hp"] = 0
+	var tv = find_poi("t_velho")
+	P["x"] = tv["x"] - 12.0
+	P["y"] = tv["y"]
+	await tr.create_timer(0.5).timeout
+	firing = true
+	await tr.create_timer(2.0).timeout
+	firing = false
+	for g in gang:
+		g["hp"] = 0
+	await tr.create_timer(0.3).timeout
+	P["x"] = tv["x"]
+	P["y"] = tv["y"] + 1.0
+	await tr.create_timer(3.5).timeout
+	print("autotest: territorio ", S["terr"].has("t_velho"))
+	add_stack({"id": "foto", "q": 1})
+	leave_place()
+	await tr.process_frame
+	_region_select("bar")
+	_region_go()
+	await tr.create_timer(0.8).timeout
+	open_shop("bar")
+	await tr.process_frame
+	close_menu()
+	remove_item("foto", 1)
+	story_advance()
+	print("autotest: historia ", S["story"])
+	open_shop("bar")
+	await tr.process_frame
+	close_menu()
+	print("AUTOTEST OK")
 	tr.quit()
 
 
@@ -231,97 +421,11 @@ func now_ms() -> float:
 	return Time.get_unix_time_from_system() * 1000.0
 
 
-func autotest() -> void:
-	## Teste automático no CI: percorre os sistemas e falha se houver erros de script.
-	var tr = get_tree()
-	S = default_save()
-	S["nick"] = "CI"
-	S["lvl"] = 6
-	S["money"] = 100000
-	login_ui.visible = false
-	hud.visible = true
-	enter_place("home")
-	await tr.create_timer(0.4).timeout
-	for id in ["home", "armeiro", "stand", "imob"]:
-		open_shop(id)
-		await tr.process_frame
-		close_menu()
-	menu_pause()
-	await tr.process_frame
-	close_menu()
-	open_region()
-	await tr.process_frame
-	_region_select("city")
-	await tr.process_frame
-	_region_go()
-	await tr.create_timer(1.0).timeout
-	print("autotest: cidade blocos ", Z["blocks"].size(), " pois ", Z["pois"].size(), " civ ", civ.size(), " peoes ", peds.size())
-	open_fullmap()
-	await tr.process_frame
-	_fullmap_pick("museu")
-	close_fullmap()
-	var cafe = find_poi("cafe")
-	P["in_car"] = false
-	P["x"] = cafe["x"]
-	P["y"] = cafe["y"] + 1.0
-	await tr.process_frame
-	do_action()
-	await tr.create_timer(0.3).timeout
-	print("autotest: dentro ", inside, " contentores ", I.get("conts", []).size())
-	for c in I["conts"]:
-		P["x"] = c["x"] + c["w"] / 2.0
-		P["y"] = c["y"] + c["h"] + 0.6
-		start_search(c)
-		search["t"] = 999.0
-		await tr.process_frame
-		await tr.process_frame
-		_loot_take_all()
-		close_loot()
-	print("autotest: saque ", S["inv"].size(), " wanted ", wanted)
-	firing = true
-	await tr.create_timer(0.5).timeout
-	firing = false
-	P["x"] = I["w"] / 2.0
-	P["y"] = I["d"] + 1.0
-	await tr.create_timer(0.3).timeout
-	print("autotest: saiu ", not inside, " wanted ", wanted)
-	wanted = 4
-	await tr.create_timer(4.0).timeout
-	print("autotest: policia ", police.size())
-	var tv = find_poi("t_velho")
-	P["in_car"] = false
-	P["x"] = tv["x"] - 12.0
-	P["y"] = tv["y"]
-	wanted = 0
-	await tr.create_timer(0.5).timeout
-	firing = true
-	await tr.create_timer(3.0).timeout
-	firing = false
-	print("autotest: gangue ", gang.size(), " hp ", S["hp"])
-	for g in gang:
-		g["hp"] = 0
-	await tr.create_timer(0.3).timeout
-	P["x"] = tv["x"]
-	P["y"] = tv["y"] + 1.0
-	await tr.create_timer(3.5).timeout
-	print("autotest: territorio ", S["terr"].has("t_velho"))
-	leave_place()
-	await tr.process_frame
-	_region_select("bar")
-	_region_go()
-	await tr.create_timer(0.8).timeout
-	open_shop("bar")
-	await tr.process_frame
-	close_menu()
-	print("AUTOTEST OK")
-	tr.quit()
-
-
 # =====================================================================
 #  GRAVAÇÃO
 # =====================================================================
 func default_save() -> Dictionary:
-	return {"nick": "", "money": 500, "xp": 0, "lvl": 1, "hp": 100.0, "weapon": "p22", "weapons": ["p22"],
+	return {"ver": 4, "story": 0, "paid": 0, "tools": [], "ties": 0, "nick": "", "money": 5000, "xp": 0, "lvl": 1, "hp": 100.0, "weapon": "p22", "weapons": ["p22"],
 		"car": "pardal", "cars": ["pardal"], "car_hp": 100.0, "bag": "b10", "bags": ["b10"], "props": {}, "terr": {},
 		"inv": [], "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
 		"stats": {"heists": 0, "busted": 0, "earned": 0, "hospital": 0}}
@@ -331,11 +435,13 @@ func load_game() -> void:
 	S = default_save()
 	if FileAccess.file_exists(SAVE_PATH):
 		var j = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-		if typeof(j) == TYPE_DICTIONARY:
+		if typeof(j) == TYPE_DICTIONARY and int(j.get("ver", 0)) == 4:
 			for k in j.keys():
 				S[k] = j[k]
 	S["lvl"] = int(S["lvl"])
 	S["money"] = int(S["money"])
+	S["story"] = int(S["story"])
+	S["ties"] = int(S["ties"])
 
 
 func save_game() -> void:
@@ -399,20 +505,6 @@ func def_of(id: String) -> Dictionary:
 	if D.TERRS.has(id):
 		return D.TERRS[id]
 	return D.SHOPS[id]
-
-
-func inv_kg() -> float:
-	var s = 0.0
-	for i in S["inv"]:
-		s += float(i["kg"])
-	return s
-
-
-func inv_value() -> int:
-	var s = 0
-	for i in S["inv"]:
-		s += int(i["v"])
-	return s
 
 
 func income_rate() -> float:
@@ -1469,6 +1561,7 @@ func free_entities() -> void:
 	parts = []
 	civ = []
 	peds = []
+	vans = []
 	if world_int:
 		world_int.queue_free()
 		world_int = null
@@ -1520,6 +1613,7 @@ func enter_place(id: String) -> void:
 	snap_cam = true
 	mode = "play"
 	spawn_life()
+	spawn_vans()
 	refresh_hotbar()
 	feed_add("Chegaste a " + Z["name"])
 	save_game()
@@ -1695,39 +1789,76 @@ func update_life(dt: float) -> void:
 
 
 # =====================================================================
-#  INTERIORES
+#  INTERIORES: mobília, funcionário, câmaras, porta dos fundos, cofres
 # =====================================================================
+func heist_locked(id: String) -> String:
+	var h = D.HEISTS[id]
+	if int(S["story"]) < int(h.get("story", 0)):
+		return "HISTÓRIA"
+	if int(S["lvl"]) < int(h["lvl"]):
+		return "NÍVEL %d" % h["lvl"]
+	return ""
+
+
+func has_tool(id: String) -> bool:
+	return S["tools"].has(id)
+
+
+func cont_height(kind: String) -> float:
+	var hs = {"caixa": 1.3, "cofre": 1.5, "vitrine": 1.25, "armario": 1.5, "armario_p": 1.3, "estante": 1.9, "frigo": 2.05, "secretaria": 0.85, "quadros": 2.6, "maquina": 1.4}
+	return hs.get(kind, 1.2)
+
+
 func enter_interior(poi: Dictionary) -> void:
 	var id: String = poi["id"]
 	var h = D.HEISTS[id]
-	if int(S["lvl"]) < int(h["lvl"]):
-		toast("Precisas de nível %d" % h["lvl"], RED)
+	var lock = heist_locked(id)
+	if lock != "":
+		toast("Bloqueado: " + lock, RED)
 		return
 	var def = D.INTERIORS[id]
 	var w: float = def["w"]
 	var d: float = def["d"]
-	I = {"id": id, "w": w, "d": d, "blocks": [], "conts": [], "raid": 0.0, "searched": 0, "door": poi, "def": def}
+	var back: float = def["back"]
+	var bdx: float = def["bdoor"]
+	I = {"id": id, "w": w, "d": d, "blocks": [], "conts": [], "cams": [], "raid": 0.0, "searched": 0, "door": poi, "def": def,
+		"clerk": {"x": def["clerk"][0], "y": def["clerk"][1], "state": "calmo", "t": 8.0, "mesh": null},
+		"bdoor": {"x": bdx, "y": back, "open": false, "mesh": null, "block": {}}, "warned_cam": false}
 	var th = 0.3
-	var wh = 3.4
-	I["blocks"].append({"x": -th, "y": -th, "w": w + th * 2, "h": th, "hgt": wh, "wall": true})
-	I["blocks"].append({"x": -th, "y": 0.0, "w": th, "h": d, "hgt": wh, "wall": true})
-	I["blocks"].append({"x": w, "y": 0.0, "w": th, "h": d, "hgt": wh, "wall": true})
-	I["blocks"].append({"x": -th, "y": d, "w": w / 2.0 - 1.2 + th, "h": th, "hgt": wh, "wall": true})
-	I["blocks"].append({"x": w / 2.0 + 1.2, "y": d, "w": w / 2.0 - 1.2 + th, "h": th, "hgt": wh, "wall": true})
-	for pr in def["props"]:
-		I["blocks"].append({"x": pr["x"], "y": pr["y"], "w": pr["w"], "h": pr["h"], "hgt": pr["hh"], "col": pr["col"], "prop": true})
+	I["blocks"].append({"x": -th, "y": -th, "w": w + th * 2, "h": th, "hgt": 3.4, "wall": "n"})
+	I["blocks"].append({"x": -th, "y": 0.0, "w": th, "h": d, "hgt": 3.4, "wall": "w"})
+	I["blocks"].append({"x": w, "y": 0.0, "w": th, "h": d, "hgt": 3.4, "wall": "e"})
+	I["blocks"].append({"x": -th, "y": d, "w": w / 2.0 - 1.2 + th, "h": th, "hgt": 1.0, "wall": "s"})
+	I["blocks"].append({"x": w / 2.0 + 1.2, "y": d, "w": w / 2.0 - 1.2 + th, "h": th, "hgt": 1.0, "wall": "s"})
+	# parede dos fundos (meia altura) com porta trancada
+	I["blocks"].append({"x": 0.0, "y": back - 0.12, "w": bdx - 0.8, "h": 0.25, "hgt": 1.7, "wall": "p"})
+	I["blocks"].append({"x": bdx + 0.8, "y": back - 0.12, "w": w - bdx - 0.8, "h": 0.25, "hgt": 1.7, "wall": "p"})
+	var db = {"x": bdx - 0.8, "y": back - 0.12, "w": 1.6, "h": 0.25, "hgt": 1.7, "doorblock": true}
+	I["blocks"].append(db)
+	I["bdoor"]["block"] = db
+	var ct = def["counter"]
+	I["blocks"].append({"x": ct[0], "y": ct[2], "w": ct[1] - ct[0], "h": 1.0, "hgt": 1.0, "counter": true})
+	for b in def["blocks"]:
+		I["blocks"].append({"x": b[0], "y": b[1], "w": b[2], "h": b[3], "hgt": b[4], "deco": true})
+	for sh in def["shelves"]:
+		I["blocks"].append({"x": sh[0], "y": sh[1], "w": sh[2], "h": sh[3], "hgt": 1.9, "deco": true})
 	for c in def["conts"]:
 		var cc = c.duplicate(true)
-		cc["hgt"] = c["hh"]
+		cc["hgt"] = cont_height(c["kind"])
 		cc["searched"] = false
 		cc["items"] = []
+		cc["back"] = float(c["y"]) < back
 		I["conts"].append(cc)
-		I["blocks"].append(cc)
+		if c["kind"] != "caixa" and c["kind"] != "quadros":
+			I["blocks"].append(cc)
+	for cm in def["cams"]:
+		I["cams"].append({"x": cm[0], "y": cm[1], "alive": true, "seen": false, "ang": atan2(d * 0.6 - cm[1], w / 2.0 - cm[0]), "mesh": null, "cone": null})
 	inside = true
 	blocks_now = I["blocks"]
 	for p in police:
 		p["mesh"].queue_free()
 	police = []
+	bullets = []
 	world.visible = false
 	car["mesh"].visible = false
 	build_interior()
@@ -1737,10 +1868,8 @@ func enter_interior(poi: Dictionary) -> void:
 	P["ang"] = -PI / 2
 	cam_yaw = 0.0
 	snap_cam = true
-	lbl_zone.text = h["name"] + " · interior"
-	feed_add("Entraste em " + h["name"])
-	if randf() < float(h["alarm"]) * 0.5:
-		trigger_alarm()
+	feed_add("Entraste: " + h["name"])
+	last_act = "?"
 
 
 func trigger_alarm() -> void:
@@ -1750,12 +1879,43 @@ func trigger_alarm() -> void:
 	if wanted == 0:
 		wanted = maxi(1, int(h["stars"]) - 1)
 		I["raid"] = 0.0
-		toast("O alarme disparou! A polícia vem a caminho", RED)
+		toast("Alarme! A polícia vem a caminho", RED)
 		feed_add("Alarme: " + h["name"], RED)
 
 
 func raid_time() -> float:
-	return 26.0 - float(D.HEISTS[I["id"]]["stars"]) * 3.0
+	return 32.0 - float(D.HEISTS[I["id"]]["stars"]) * 3.0
+
+
+func make_shelf(parent: Node3D, x: float, y: float, w: float, h: float, st: String) -> void:
+	## estante de loja com produtos (garrafas ou caixas)
+	var wood = mat("#5a4634") if st == "garrafas" else mat("#d9dde2")
+	var long_x = w >= h
+	var length = w if long_x else h
+	var depth = h if long_x else w
+	var g = Node3D.new()
+	g.position = Vector3(x + w / 2.0, 0, y + h / 2.0)
+	if not long_x:
+		g.rotation.y = PI / 2
+	parent.add_child(g)
+	box(Vector3(length, 1.9, 0.06), wood, Vector3(0, 0.95, 0), g)
+	var cols_b = ["#2f5a3a", "#7a4a1e", "#5a1e2e", "#c9b27e", "#1e3a5a"]
+	var cols_c = ["#e0483e", "#4a8fe0", "#e8b931", "#3cc48a", "#ecebe6", "#9a6ad0"]
+	for lv in 4:
+		var by = 0.2 + lv * 0.48
+		box(Vector3(length, 0.05, depth), wood, Vector3(0, by, 0), g, false)
+		var px = -length / 2.0 + 0.2
+		var k = 0
+		while px < length / 2.0 - 0.15:
+			for side in [-1.0, 1.0]:
+				var pz = side * depth * 0.25
+				if st == "garrafas":
+					var cb = cyl(0.05, 0.065, 0.3, mat(cols_b[(k + lv) % cols_b.size()], 0.3, 0.2), Vector3(px, by + 0.18, pz), g, 6)
+					cb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				else:
+					box(Vector3(0.24, 0.22, 0.16), mat(cols_c[(k + lv * 2) % cols_c.size()]), Vector3(px, by + 0.14, pz), g, false)
+			px += 0.2 if st == "garrafas" else 0.3
+			k += 1
 
 
 func build_interior() -> void:
@@ -1766,72 +1926,192 @@ func build_interior() -> void:
 	var def = I["def"]
 	var w: float = I["w"]
 	var d: float = I["d"]
-	box(Vector3(300, 0.1, 300), mat("#1b1c1f"), Vector3(w / 2.0, -0.12, d / 2.0), world_int, false)
-	box(Vector3(w, 0.2, d), mat(def["floor"], 0.7), Vector3(w / 2.0, -0.1, d / 2.0), world_int, false)
-	# marcações no chão
-	var ln = mat("#d9b84a")
-	box(Vector3(w * 0.5, 0.02, 0.12), ln, Vector3(w / 2.0, 0.01, d * 0.55), world_int, false)
-	box(Vector3(w * 0.5, 0.02, 0.12), ln, Vector3(w / 2.0, 0.01, d * 0.85), world_int, false)
-	# paredes com faixa de cor
+	var back: float = def["back"]
+	box(Vector3(300, 0.1, 300), mat("#17181b"), Vector3(w / 2.0, -0.14, d / 2.0), world_int, false)
+	box(Vector3(w, 0.2, d), mat(def["floor"], 0.6), Vector3(w / 2.0, -0.1, d / 2.0), world_int, false)
+	box(Vector3(w, 0.02, back), mat("#4a4d52", 0.8), Vector3(w / 2.0, 0.005, back / 2.0), world_int, false)
+	# paredes: fundo e lados altos, frente e divisória baixas (corte para a câmara ver)
 	for b in I["blocks"]:
-		if b.get("wall", false):
-			var cx: float = b["x"] + b["w"] / 2.0
-			var cz: float = b["y"] + b["h"] / 2.0
+		if not b.has("wall"):
+			continue
+		var cx: float = b["x"] + b["w"] / 2.0
+		var cz: float = b["y"] + b["h"] / 2.0
+		var hh: float = b["hgt"]
+		if b["wall"] == "s" or b["wall"] == "p":
+			box(Vector3(b["w"], hh, b["h"]), mat(def["stripe"]), Vector3(cx, hh / 2.0, cz), world_int)
+			box(Vector3(b["w"] + 0.06, 0.08, b["h"] + 0.06), mat("#2a2a2c"), Vector3(cx, hh + 0.04, cz), world_int, false)
+		else:
 			box(Vector3(b["w"], 1.1, b["h"]), mat(def["stripe"]), Vector3(cx, 0.55, cz), world_int)
 			box(Vector3(b["w"], 2.3, b["h"]), mat(def["wall"]), Vector3(cx, 2.25, cz), world_int)
-			box(Vector3(b["w"] + 0.05, 0.12, b["h"] + 0.05), mat("#3a3a3a"), Vector3(cx, 3.42, cz), world_int, false)
-		elif b.get("prop", false):
-			box(Vector3(b["w"], b["hgt"], b["h"]), mat(b["col"], 0.6), Vector3(b["x"] + b["w"] / 2.0, b["hgt"] / 2.0, b["y"] + b["h"] / 2.0), world_int)
+	# balcão
+	var ct = def["counter"]
+	var clen: float = ct[1] - ct[0]
+	var n = maxi(1, int(round(clen / 1.64)))
+	for i in n:
+		var tile = clen / n
+		var cmi = model_inst_at("rest/kitchencounter_straight_A", Vector3(tile / 2.0, 1.0, 0.49), 0.0, world_int, Vector3(ct[0] + tile * (i + 0.5), 0, ct[2] + 0.5))
+		if cmi == null:
+			box(Vector3(tile, 1.0, 1.0), mat("#6b4a32"), Vector3(ct[0] + tile * (i + 0.5), 0.5, ct[2] + 0.5), world_int)
+	# estantes de loja e decoração
+	for sh in def["shelves"]:
+		make_shelf(world_int, sh[0], sh[1], sh[2], sh[3], sh[4])
+	for dc in def["decor"]:
+		model_inst_at(dc[0], Vector3.ONE * float(dc[4]), float(dc[3]), world_int, Vector3(dc[1], float(dc[5]), dc[2]))
+	for i in maxi(1, int(w / 6.0)):
+		model_inst_at("furn/pictureframe_large_A" if i % 2 == 0 else "furn/pictureframe_large_B", Vector3.ONE * 0.9, 0.0, world_int, Vector3((i + 0.5) * w / maxi(1, int(w / 6.0)), 2.3, 0.02))
 	# contentores
 	for c in I["conts"]:
-		var cx2: float = c["x"] + c["w"] / 2.0
-		var cz2: float = c["y"] + c["h"] / 2.0
-		var hh: float = c["hgt"]
-		box(Vector3(c["w"], hh, c["h"]), mat(c["col"], 0.5, 0.2), Vector3(cx2, hh / 2.0, cz2), world_int)
-		box(Vector3(c["w"] * 0.9, 0.05, 0.04), mat("#111111"), Vector3(cx2, hh * 0.6, c["y"] + c["h"] + 0.01), world_int, false)
-		box(Vector3(c["w"] * 0.9, 0.05, 0.04), mat("#111111"), Vector3(cx2, hh * 0.3, c["y"] + c["h"] + 0.01), world_int, false)
-		box(Vector3(c["w"] + 0.06, 0.06, c["h"] + 0.06), mat("#5a5d63", 0.4, 0.5), Vector3(cx2, hh + 0.03, cz2), world_int, false)
-		var lab = Label3D.new()
-		lab.text = c["n"]
-		lab.font_size = 42
-		lab.pixel_size = 0.008
-		lab.outline_size = 8
-		lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		lab.no_depth_test = true
-		lab.modulate = Color("#ffe9a8")
-		lab.position = Vector3(cx2, hh + 0.55, cz2)
-		world_int.add_child(lab)
-		c["label"] = lab
-	# luzes de teto (painéis) e iluminação
+		build_container(c)
+	# porta dos fundos
+	var bd = I["bdoor"]
+	var dpiv = Node3D.new()
+	dpiv.position = Vector3(bd["x"] - 0.75, 0, bd["y"])
+	world_int.add_child(dpiv)
+	var dm = model_inst_at("rest/door_A", Vector3(0.94, 0.62, 0.82), 0.0, dpiv, Vector3.ZERO)
+	if dm == null:
+		box(Vector3(1.5, 1.7, 0.12), mat("#6b4a32"), Vector3(0.75, 0.85, 0), dpiv)
+	var lk = box(Vector3(0.16, 0.2, 0.3), unshaded(RED), Vector3(1.3, 1.0, 0.0), dpiv, false)
+	bd["mesh"] = dpiv
+	bd["lock"] = lk
+	# câmaras de vigilância
+	for cm in I["cams"]:
+		var g = Node3D.new()
+		g.position = Vector3(cm["x"], 2.9, cm["y"])
+		g.rotation.y = -cm["ang"]
+		world_int.add_child(g)
+		box(Vector3(0.5, 0.22, 0.24), mat("#e9eef2", 0.4, 0.2), Vector3(0.15, 0, 0), g)
+		box(Vector3(0.12, 0.16, 0.18), mat("#111111"), Vector3(0.44, 0, 0), g, false)
+		var led = box(Vector3(0.06, 0.06, 0.06), unshaded(RED), Vector3(0.3, 0.14, 0), g, false)
+		cm["mesh"] = g
+		cm["led"] = led
+		# cone de visão no chão
+		var am = ArrayMesh.new()
+		var verts = PackedVector3Array([Vector3(0, 0, 0), Vector3(cos(-0.9) * 9.0, 0, sin(-0.9) * 9.0), Vector3(9.0, 0, 0), Vector3(cos(0.9) * 9.0, 0, sin(0.9) * 9.0)])
+		var arr = []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = verts
+		arr[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		var cone = MeshInstance3D.new()
+		cone.mesh = am
+		var cmat = unshaded(RED, 0.13)
+		cmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		cone.material_override = cmat
+		cone.position = Vector3(cm["x"], 0.03, cm["y"])
+		cone.rotation.y = -cm["ang"]
+		cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world_int.add_child(cone)
+		cm["cone"] = cone
+	# luzes
 	var nl = maxi(1, int(w / 7.0))
 	for i in nl:
-		var lx = (i + 0.5) * w / nl
-		box(Vector3(2.2, 0.08, 0.5), unshaded(Color("#fffbe8")), Vector3(lx, 3.3, d * 0.3), world_int, false)
-		box(Vector3(2.2, 0.08, 0.5), unshaded(Color("#fffbe8")), Vector3(lx, 3.3, d * 0.7), world_int, false)
-	var ol = OmniLight3D.new()
-	ol.position = Vector3(w / 2.0, 3.0, d / 2.0)
-	ol.omni_range = maxf(w, d) * 0.9
-	ol.light_energy = 1.4
-	ol.light_color = Color("#fff3dc")
-	world_int.add_child(ol)
-	# refém (mãos no ar)
-	hostage_mesh = make_char("Mage", false, "#c9c9c9")
-	hostage_mesh.position = Vector3(def["hostage"][0], 0.0, def["hostage"][1])
-	hostage_mesh.rotation.y = -PI / 2
-	world_int.add_child(hostage_mesh)
-	I["blocks"].append({"x": def["hostage"][0] - 0.35, "y": def["hostage"][1] - 0.35, "w": 0.7, "h": 0.7, "hgt": 2.0, "prop": true, "col": "#000000", "hostage": true})
-	# saída
+		var ol = OmniLight3D.new()
+		ol.position = Vector3((i + 0.5) * w / nl, 3.2, d * 0.55)
+		ol.omni_range = 11.0
+		ol.light_energy = 1.3
+		ol.light_color = Color("#fff3dc")
+		world_int.add_child(ol)
+	# funcionário
+	var ck = I["clerk"]
+	var cmesh = make_char("Mage" if I["id"] in ["farmacia", "joalharia", "banco"] else "Barbarian", false, "#c9c9c9")
+	cmesh.position = Vector3(ck["x"], 0.0, ck["y"])
+	cmesh.rotation.y = -PI / 2
+	world_int.add_child(cmesh)
+	ck["mesh"] = cmesh
+	hostage_mesh = cmesh
+	I["blocks"].append({"x": ck["x"] - 0.35, "y": ck["y"] - 0.35, "w": 0.7, "h": 0.7, "hgt": 1.9, "deco": true})
 	var exm = make_ring(Vector3(w / 2.0, 0.05, d + 0.6), 0.9, 1.2, OK_C)
 	exm.reparent(world_int)
 
 
+func model_inst_at(path: String, scale_v: Vector3, rot_y: float, parent: Node3D, pos: Vector3) -> Node3D:
+	## modelos de mobília: path = "furn/nome" ou "rest/nome"
+	var ps = scene_of("res://assets/kaykit/" + path + ".gltf")
+	if ps == null:
+		return null
+	var inst: Node3D = ps.instantiate()
+	inst.scale = scale_v
+	inst.rotation.y = rot_y
+	inst.position = pos
+	parent.add_child(inst)
+	return inst
+
+
+func build_container(c: Dictionary) -> void:
+	var cx: float = c["x"] + c["w"] / 2.0
+	var cz: float = c["y"] + c["h"] / 2.0
+	var hh: float = c["hgt"]
+	var kind: String = c["kind"]
+	var top = hh
+	if kind == "caixa":
+		box(Vector3(0.55, 0.32, 0.5), mat("#26282d", 0.4, 0.3), Vector3(cx, 1.16, cz), world_int)
+		box(Vector3(0.4, 0.26, 0.05), unshaded(Color("#7fd6a0")), Vector3(cx, 1.42, cz + 0.12), world_int, false)
+		box(Vector3(0.5, 0.06, 0.3), mat("#3a3d44"), Vector3(cx, 1.03, cz + 0.3), world_int, false)
+		top = 1.6
+	elif kind == "cofre":
+		box(Vector3(c["w"], hh, c["h"]), mat("#3c4148", 0.35, 0.7), Vector3(cx, hh / 2.0, cz), world_int)
+		box(Vector3(c["w"] * 0.8, hh * 0.8, 0.06), mat("#555b64", 0.3, 0.8), Vector3(cx, hh / 2.0, c["y"] + c["h"] + 0.02), world_int, false)
+		var dial = cyl(0.14, 0.14, 0.08, mat("#e8b931", 0.3, 0.8), Vector3(cx - c["w"] * 0.15, hh * 0.55, c["y"] + c["h"] + 0.08), world_int, 12)
+		dial.rotation.x = PI / 2
+		box(Vector3(0.08, 0.36, 0.08), mat("#c9ccd2", 0.3, 0.8), Vector3(cx + c["w"] * 0.2, hh * 0.55, c["y"] + c["h"] + 0.08), world_int, false)
+	elif kind == "vitrine":
+		box(Vector3(c["w"], 0.8, c["h"]), mat("#3a2c22", 0.5), Vector3(cx, 0.4, cz), world_int)
+		box(Vector3(c["w"] - 0.1, 0.04, c["h"] - 0.1), mat("#7a1e2e", 0.9), Vector3(cx, 0.82, cz), world_int, false)
+		var gm = StandardMaterial3D.new()
+		gm.albedo_color = Color(0.7, 0.9, 1.0, 0.22)
+		gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		gm.roughness = 0.05
+		gm.metallic = 0.3
+		box(Vector3(c["w"] - 0.06, 0.42, c["h"] - 0.06), gm, Vector3(cx, 1.03, cz), world_int, false)
+		for k in 3:
+			box(Vector3(0.14, 0.1, 0.14), mat("#e8b931", 0.25, 0.9), Vector3(cx + (k - 1) * c["w"] * 0.28, 0.9, cz), world_int, false)
+	elif kind == "armario":
+		if model_inst_at("furn/cabinet_medium_decorated", Vector3.ONE * 0.82, 0.0, world_int, Vector3(cx, 0, cz)) == null:
+			box(Vector3(c["w"], hh, c["h"]), mat("#8a6a4a"), Vector3(cx, hh / 2.0, cz), world_int)
+	elif kind == "armario_p":
+		if model_inst_at("furn/cabinet_small_decorated", Vector3.ONE * 0.82, 0.0, world_int, Vector3(cx, 0, cz)) == null:
+			box(Vector3(c["w"], hh, c["h"]), mat("#b8962e"), Vector3(cx, hh / 2.0, cz), world_int)
+	elif kind == "estante":
+		make_shelf(world_int, c["x"], c["y"], c["w"], c["h"], c.get("st", "caixas"))
+	elif kind == "frigo":
+		if model_inst_at("rest/fridge_A_decorated", Vector3.ONE * 0.82, 0.0, world_int, Vector3(cx, 0, cz)) == null:
+			box(Vector3(c["w"], hh, c["h"]), mat("#e9eef2", 0.3, 0.2), Vector3(cx, hh / 2.0, cz), world_int)
+	elif kind == "secretaria":
+		if model_inst_at("furn/table_medium", Vector3.ONE * 0.82, 0.0, world_int, Vector3(cx, 0, cz)) == null:
+			box(Vector3(c["w"], hh, c["h"]), mat("#6b4a32"), Vector3(cx, hh / 2.0, cz), world_int)
+		model_inst_at("furn/book_set", Vector3.ONE * 0.82, 0.4, world_int, Vector3(cx - 0.3, 1.02, cz))
+		box(Vector3(0.5, 0.03, 0.36), mat("#3a3d44", 0.4, 0.4), Vector3(cx + 0.35, 0.86, cz), world_int, false)
+	elif kind == "quadros":
+		var nq = maxi(2, int(c["w"] / 2.4))
+		for k in nq:
+			model_inst_at("furn/pictureframe_large_B" if k % 2 == 0 else "furn/pictureframe_large_A", Vector3.ONE * 1.1, 0.0, world_int, Vector3(c["x"] + (k + 0.5) * c["w"] / nq, 1.3, c["y"] + 0.15))
+		top = 2.2
+	else:
+		box(Vector3(c["w"], hh, c["h"]), mat("#9aa0a6", 0.4, 0.5), Vector3(cx, hh / 2.0, cz), world_int)
+		box(Vector3(c["w"] * 0.7, hh * 0.3, 0.05), mat("#26282d"), Vector3(cx, hh * 0.7, c["y"] + c["h"] + 0.02), world_int, false)
+	var lab = Label3D.new()
+	lab.text = c["n"]
+	lab.font_size = 34
+	lab.pixel_size = 0.007
+	lab.outline_size = 8
+	lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lab.no_depth_test = true
+	lab.modulate = Color("#ffe9a8")
+	lab.position = Vector3(cx, top + 0.45, cz)
+	lab.visible = false
+	world_int.add_child(lab)
+	c["label"] = lab
+
+
 func near_cont() -> Dictionary:
 	var best = {}
-	var bd = 1.5
+	var bd = 1.6
 	for c in I.get("conts", []):
 		var cx = clampf(P["x"], c["x"], c["x"] + c["w"])
 		var cy = clampf(P["y"], c["y"], c["y"] + c["h"])
 		var d = Vector2(P["x"] - cx, P["y"] - cy).length()
+		if c["kind"] == "caixa":
+			d -= 0.9
 		if d < bd:
 			bd = d
 			best = c
@@ -1839,18 +2119,78 @@ func near_cont() -> Dictionary:
 
 
 func start_search(c: Dictionary) -> void:
-	search = {"c": c, "t": 0.0}
-	if c.get("alarm", false) and randf() < 0.7:
-		trigger_alarm()
+	search = {"kind": "cont", "c": c, "t": 0.0, "need": float(c["time"]), "label": ("A PERFURAR: " if c["kind"] == "cofre" else "A VASCULHAR: ") + str(c["n"]).to_upper()}
+	if c["kind"] == "cofre":
+		make_noise()
 
 
-func finish_search(c: Dictionary) -> void:
+func start_door() -> void:
+	var need = 6.0
+	var silent = false
+	if has_tool("gazuas"):
+		need = 4.0
+		silent = true
+	elif has_tool("pe_cabra"):
+		need = 3.0
+	search = {"kind": "door", "t": 0.0, "need": need, "label": "A ABRIR A FECHADURA" if silent else "A ARROMBAR A PORTA"}
+	if not silent:
+		make_noise()
+
+
+func make_noise() -> void:
+	## barulho: se o funcionário estiver livre, liga logo à polícia
+	var ck = I["clerk"]
+	if ck["state"] == "calmo":
+		ck["t"] = minf(ck["t"], 1.5)
+
+
+func threaten_clerk() -> void:
+	var ck = I["clerk"]
+	ck["state"] = "rendido"
+	ck["t"] = 28.0
+	toast("Funcionário rendido", OK_C)
+	last_act = "?"
+
+
+func tie_clerk() -> void:
+	var ck = I["clerk"]
+	ck["state"] = "amarrado"
+	S["ties"] = int(S["ties"]) - 1
+	toast("Funcionário amarrado", OK_C)
+	feed_add("Funcionário neutralizado", OK_C)
+	last_act = "?"
+
+
+func finish_search() -> void:
+	if search["kind"] == "door":
+		var bd = I["bdoor"]
+		bd["open"] = true
+		I["blocks"].erase(bd["block"])
+		bd["mesh"].rotation.y = 1.5
+		bd["lock"].material_override = unshaded(OK_C)
+		search = {}
+		feed_add("Porta dos fundos aberta", OK_C)
+		last_act = "?"
+		return
+	if search["kind"] == "table":
+		var v = search["van"]
+		var amount = int(v["table"])
+		search = {}
+		last_act = "?"
+		if add_stack({"id": "cash", "v": amount}) <= 0:
+			toast("Saco cheio — não cabe o dinheiro", RED)
+			return
+		v["table"] = 0
+		toast("+" + fmt(amount), GOLD)
+		feed_add("Recolheste " + fmt(amount), GOLD)
+		last_act = "?"
+		save_game()
+		return
+	var c = search["c"]
 	c["searched"] = true
 	c["items"] = roll_loot(c["loot"])
 	I["searched"] = int(I["searched"]) + 1
 	search = {}
-	if c.has("label") and is_instance_valid(c["label"]):
-		(c["label"] as Label3D).modulate = Color("#8a8a8a")
 	open_loot(c)
 
 
@@ -1858,14 +2198,14 @@ func roll_loot(table: Array) -> Array:
 	var out = []
 	for L in table:
 		if L.has("cash"):
-			var v = randi_range(L["cash"][0], L["cash"][1])
-			out.append({"n": "Dinheiro sujo", "kg": maxf(0.1, snappedf(v / 1000.0, 0.01)), "v": v, "dirty": true})
+			out.append({"id": "cash", "v": int(round(randi_range(L["cash"][0], L["cash"][1]) / 100.0)) * 100})
+		elif L.has("story_item"):
+			if int(S["story"]) == int(L["chapter"]) and count_item(L["story_item"]) == 0:
+				out.append({"id": L["story_item"], "q": 1})
 		elif randf() < float(L["ch"]):
-			var q = randi_range(L["q"][0], L["q"][1])
-			for k in q:
-				out.append({"n": L["n"], "kg": L["kg"], "v": L["v"]})
+			out.append({"id": L["id"], "q": randi_range(L["q"][0], L["q"][1])})
 	if out.is_empty():
-		out.append({"n": "Trocos", "kg": 0.1, "v": randi_range(10, 40), "dirty": true})
+		out.append({"id": "cash", "v": randi_range(1, 4) * 100})
 	return out
 
 
@@ -1873,6 +2213,11 @@ func exit_interior() -> void:
 	var h = D.HEISTS[I["id"]]
 	var door = I["door"]
 	var searched = int(I["searched"])
+	var filmed = false
+	for cm in I["cams"]:
+		if cm["alive"] and cm["seen"]:
+			filmed = true
+	var hid = I["id"]
 	inside = false
 	if world_int:
 		world_int.queue_free()
@@ -1880,26 +2225,40 @@ func exit_interior() -> void:
 	world.visible = true
 	car["mesh"].visible = true
 	blocks_now = Z["blocks"]
+	bullets = []
 	P["x"] = door["x"]
 	P["y"] = door["y"] + 1.6
 	P["ang"] = PI / 2
 	cam_yaw = 0.0
 	snap_cam = true
-	lbl_zone.text = Z["name"]
 	if searched > 0:
-		S["cds"][I["id"]] = now_ms() + float(h["cd"]) * 1000.0
+		S["cds"][hid] = now_ms() + float(h["cd"]) * 1000.0
 		S["stats"]["heists"] = int(S["stats"]["heists"]) + 1
 		add_xp(h["xp"])
-		wanted = mini(5, maxi(wanted, int(h["stars"])))
+		var stars = int(h["stars"])
+		if wanted == 0:
+			stars = maxi(0, stars - 2)
+			if not filmed:
+				stars = 0
+		elif filmed:
+			stars += 1
+		wanted = mini(5, maxi(wanted, stars))
 		lost_t = 0.0
-		toast("Assalto concluído — foge!", GOLD)
+		if wanted == 0:
+			toast("Assalto limpo — ninguém deu por nada", OK_C)
+			add_xp(h["xp"] * 0.5)
+		elif filmed:
+			toast("As câmaras filmaram-te — foge!", RED)
+		else:
+			toast("Assalto concluído — foge!", GOLD)
 		feed_add("Assalto: " + h["name"], GOLD)
 		var m = S["mission"]
-		if not m.is_empty() and m["target"] == I["id"] and not m["done"]:
+		if not m.is_empty() and m["target"] == hid and not m["done"]:
 			m["done"] = true
-			toast("Contrato cumprido! Vai ao Bar O Farol", GOLD)
+			toast("Contrato cumprido — vai ao Bar O Farol", GOLD)
 	I = {}
 	search = {}
+	last_act = "?"
 	save_game()
 
 
@@ -1912,21 +2271,82 @@ func update_interior(dt: float) -> void:
 	if iv.length() > 0.1 and not firing:
 		P["ang"] = atan2(iv.y, iv.x)
 	push_out(P, 0.4)
+	if P["hurt"] > 0:
+		P["hurt"] = P["hurt"] - dt
 	P["fire_cd"] = P["fire_cd"] - dt
 	if firing and P["fire_cd"] <= 0:
 		shoot()
-		bullets = []
-		trigger_alarm()
+		make_noise()
+	# balas: paredes e câmaras
+	for b in bullets:
+		b["x"] = b["x"] + b["vx"] * dt
+		b["y"] = b["y"] + b["vy"] * dt
+		b["life"] = b["life"] - dt
+		for cm in I["cams"]:
+			if cm["alive"] and Vector2(cm["x"] - b["x"], cm["y"] - b["y"]).length() < 0.9:
+				cm["alive"] = false
+				cm["cone"].visible = false
+				cm["led"].visible = false
+				cm["mesh"].rotation.z = 0.6
+				b["life"] = 0.0
+				boom(cm["x"], cm["y"], Color("#ffd56a"), 8)
+				feed_add("Câmara destruída", OK_C)
+		if b["life"] > 0 and (b["x"] < 0 or b["y"] < 0 or b["x"] > I["w"] or b["y"] > I["d"]):
+			b["life"] = 0.0
+	var bl = []
+	for b in bullets:
+		if b["life"] > 0:
+			bl.append(b)
+	bullets = bl
+	# tarefa em curso (vasculhar / porta)
 	if not search.is_empty():
-		var c = search["c"]
-		if near_cont() == c:
+		var ok = true
+		if search["kind"] == "cont":
+			ok = near_cont() == search["c"]
+		elif search["kind"] == "door":
+			ok = Vector2(P["x"] - I["bdoor"]["x"], P["y"] - I["bdoor"]["y"]).length() < 2.4
+		if ok:
 			search["t"] = search["t"] + dt
-			if search["t"] >= float(c["time"]):
-				finish_search(c)
+			if search["t"] >= search["need"]:
+				finish_search()
 				return
 		else:
 			search = {}
-			toast("Busca interrompida", RED)
+			toast("Interrompido", RED)
+	# funcionário
+	var ck = I["clerk"]
+	if ck["state"] == "calmo":
+		ck["t"] = ck["t"] - dt
+		if ck["t"] <= 0:
+			ck["state"] = "ligou"
+			toast("O funcionário ligou à polícia!", RED)
+			trigger_alarm()
+	elif ck["state"] == "rendido":
+		ck["t"] = ck["t"] - dt
+		if ck["t"] <= 0:
+			ck["state"] = "calmo"
+			ck["t"] = 5.0
+			toast("O funcionário está a ganhar coragem…", RED)
+			last_act = "?"
+	# câmaras
+	for cm in I["cams"]:
+		if not cm["alive"]:
+			continue
+		cm["led"].visible = int(t * 3.0) % 2 == 0
+		var dx: float = P["x"] - cm["x"]
+		var dy: float = P["y"] - cm["y"]
+		if Vector2(dx, dy).length() < 9.0 and absf(ang_diff(atan2(dy, dx), cm["ang"])) < 0.9:
+			if not has_tool("mascara"):
+				cm["seen"] = true
+				if not I["warned_cam"]:
+					I["warned_cam"] = true
+					toast("Uma câmara está a filmar-te", RED)
+	# etiquetas só perto
+	var nc = near_cont()
+	for c in I["conts"]:
+		if c.has("label") and is_instance_valid(c["label"]):
+			c["label"].visible = c == nc
+			c["label"].modulate = Color("#8a8a8a") if c["searched"] else Color("#ffe9a8")
 	if wanted > 0:
 		I["raid"] = float(I["raid"]) + dt
 		if I["raid"] >= raid_time():
@@ -1939,6 +2359,149 @@ func update_interior(dt: float) -> void:
 	update_act_button()
 
 
+func interior_action() -> Dictionary:
+	if not search.is_empty():
+		return {"l": "…", "off": true}
+	var ck = I["clerk"]
+	var dck = Vector2(P["x"] - ck["x"], P["y"] - ck["y"]).length()
+	if ck["state"] == "calmo" and dck < 6.0:
+		return {"l": "AMEAÇAR", "f": threaten_clerk}
+	if ck["state"] == "rendido" and dck < 2.6 and int(S["ties"]) > 0:
+		return {"l": "AMARRAR", "f": tie_clerk}
+	var bd = I["bdoor"]
+	if not bd["open"] and Vector2(P["x"] - bd["x"], P["y"] - bd["y"]).length() < 2.0:
+		return {"l": "ARROMBAR", "f": start_door}
+	var c = near_cont()
+	if not c.is_empty():
+		if c["searched"]:
+			return {"l": "ABRIR", "f": func(): open_loot(c)}
+		if c["kind"] == "cofre":
+			if not has_tool("berbequim"):
+				return {"l": "FALTA\nBERBEQUIM", "off": true}
+			return {"l": "PERFURAR", "f": func(): start_search(c)}
+		return {"l": "VASCULHAR", "f": func(): start_search(c)}
+	if ck["state"] == "rendido" and dck < 6.0 and ck["t"] < 12.0:
+		return {"l": "AMEAÇAR", "f": threaten_clerk}
+	return {}
+
+
+# =====================================================================
+#  CARRINHAS DE RECEPTAÇÃO
+# =====================================================================
+func spawn_vans() -> void:
+	vans = []
+	if Z["kind"] != "city":
+		return
+	var rng = RandomNumberGenerator.new()
+	rng.seed = int(Time.get_unix_time_from_system() / 600.0) + 77
+	var spots = D.VAN_SPOTS.duplicate()
+	var types = D.VAN_TYPES.duplicate()
+	for i in 3:
+		var si = rng.randi() % spots.size()
+		var sp = spots[si]
+		spots.remove_at(si)
+		var ti = rng.randi() % types.size()
+		var ty = types[ti]
+		types.remove_at(ti)
+		var rw: float = Z["rw"]
+		var side: float = sp[2]
+		var vx: float = sp[0]
+		var vy: float = sp[1] + side * (rw - 0.4)
+		var v = {"x": vx, "y": vy, "type": ty, "table": 0, "tx": vx + 4.6, "ty": sp[1] + side * (rw + 1.5), "nx": vx + 2.2, "ny": sp[1] + side * (rw + 1.6), "risk": -1.0, "rivals": false, "id": "van%d" % i}
+		var blk = {"x": vx - 2.7, "y": vy - 1.15, "w": 5.4, "h": 2.3, "hgt": 2.5, "car": true}
+		Z["blocks"].append(blk)
+		Z["blocks"].append({"x": v["tx"] - 0.7, "y": v["ty"] - 0.5, "w": 1.4, "h": 1.0, "hgt": 0.8, "car": true})
+		Z["pois"].append({"id": v["id"], "kind": "van", "x": v["nx"], "y": v["ny"], "name": ty["name"]})
+		# visual: carrinha, toldo, mesa, receptador
+		var g = Node3D.new()
+		g.position = Vector3(vx, 0, vy)
+		world.add_child(g)
+		var bm = mat(ty["col"], 0.5, 0.3)
+		box(Vector3(3.6, 2.0, 2.1), bm, Vector3(-0.8, 1.35, 0), g)
+		box(Vector3(1.5, 1.4, 2.0), bm, Vector3(1.85, 1.05, 0), g)
+		box(Vector3(0.1, 0.7, 1.7), mat("#1b2633", 0.15, 0.6), Vector3(2.62, 1.35, 0), g, false)
+		for sx in [1.7, -1.6]:
+			for sz in [0.95, -0.95]:
+				var wh = cyl(0.42, 0.42, 0.3, mat("#17181a"), Vector3(sx, 0.42, sz), g, 10)
+				wh.rotation.x = PI / 2
+		box(Vector3(3.4, 0.08, 1.6), mat("#e8b931"), Vector3(-0.8, 2.3, side * 1.7), g)
+		box(Vector3(3.2, 1.3, 0.06), mat("#17181a"), Vector3(-0.8, 1.5, side * 1.06), g, false)
+		var tb = model_inst_at("furn/table_medium", Vector3(0.68, 0.82, 0.5), 0.0, world, Vector3(v["tx"], 0.25, v["ty"]))
+		if tb == null:
+			box(Vector3(1.4, 0.8, 1.0), mat("#6b4a32"), Vector3(v["tx"], 0.65, v["ty"]), world)
+		var stacks = []
+		for k in 6:
+			var st = box(Vector3(0.34, 0.12, 0.2), mat("#4a965a"), Vector3(v["tx"] - 0.4 + (k % 3) * 0.4, 1.15 + (k / 3) * 0.13, v["ty"]), world, false)
+			st.visible = false
+			stacks.append(st)
+		v["stacks"] = stacks
+		var npc = make_char("Barbarian", false, "#3a3a3a")
+		npc.position = Vector3(v["nx"], 0.25, v["ny"])
+		npc.rotation.y = -PI / 2 * side
+		world.add_child(npc)
+		var lab = Label3D.new()
+		lab.text = "%s\n+30%% %s" % [ty["name"], D.CAT_NAMES[ty["cat"]]]
+		lab.font_size = 48
+		lab.pixel_size = 0.01
+		lab.outline_size = 10
+		lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lab.modulate = Color("#b8f0c8")
+		lab.position = Vector3(vx - 0.8, 3.3, vy)
+		world.add_child(lab)
+		vans.append(v)
+
+
+func near_van() -> Dictionary:
+	for v in vans:
+		if Vector2(P["x"] - v["nx"], P["y"] - v["ny"]).length() < 3.6 or Vector2(P["x"] - v["tx"], P["y"] - v["ty"]).length() < 2.6:
+			return v
+	return {}
+
+
+func van_price(st: Dictionary, v: Dictionary) -> int:
+	var it = item_def(st["id"])
+	if st["id"] == "cash" or it["cat"] == "historia":
+		return 0
+	var mult = 1.3 if it["cat"] == v["type"]["cat"] else 0.9
+	return int(round(float(it["v"]) * int(st["q"]) * mult * terr_bonus() / 10.0)) * 10
+
+
+func van_sold(v: Dictionary, amount: int) -> void:
+	v["table"] = int(v["table"]) + amount
+	if v["risk"] < 0 and not v["rivals"]:
+		v["risk"] = randf_range(5.0, 10.0)
+
+
+func update_vans(dt: float) -> void:
+	for v in vans:
+		if int(v["table"]) <= 0:
+			v["rivals"] = false
+			v["risk"] = -1.0
+		var n = clampi(int(ceil(float(v["table"]) / 15000.0)), 0, 6)
+		for k in 6:
+			v["stacks"][k].visible = k < n
+		if int(v["table"]) > 0 and v["risk"] >= 0:
+			v["risk"] = v["risk"] - dt
+			if v["risk"] <= 0:
+				v["risk"] = -1.0
+				var roll = randf()
+				if roll < 0.5:
+					v["rivals"] = true
+					toast("Rivais a caminho — pega no dinheiro e foge!", RED)
+					feed_add("Rivais avistados", RED)
+					for k in randi_range(2, 3):
+						var rp = road_point_near(28.0, 45.0, randf() < 0.5)
+						if rp.x < 0:
+							continue
+						var gm = make_char("Rogue_Hooded", true, "#6a3a8a")
+						add_child(gm)
+						gang.append({"x": rp.x, "y": rp.y, "hp": 40.0, "cd": randf_range(0.8, 1.6), "ang": 0.0, "mesh": gm, "phase": 0.0, "terr": "", "van": v})
+				elif roll < 0.75 and wanted == 0:
+					wanted = 1
+					lost_t = 0.0
+					toast("Patrulha a aproximar-se!", RED)
+
+
 # =====================================================================
 #  INPUT
 # =====================================================================
@@ -1947,7 +2510,7 @@ func hud_hit(pos: Vector2) -> String:
 		return ""
 	if fire_panel.get_global_rect().grow(10).has_point(pos):
 		return "fire"
-	if act_panel.get_global_rect().grow(10).has_point(pos):
+	if act_panel.visible and act_panel.get_global_rect().grow(10).has_point(pos):
 		return "act"
 	if menu_panel.get_global_rect().grow(6).has_point(pos):
 		return "menu"
@@ -1984,7 +2547,7 @@ func _input(e: InputEvent) -> void:
 				elif k.keycode == KEY_SPACE:
 					firing = true
 				elif k.keycode == KEY_ESCAPE:
-					menu_pause()
+					open_inventory()
 				elif k.keycode == KEY_M:
 					open_fullmap()
 				elif k.keycode == KEY_Q:
@@ -2009,7 +2572,7 @@ func _pointer(id: int, pos: Vector2, pressed: bool) -> void:
 		elif h == "act":
 			do_action()
 		elif h == "menu":
-			menu_pause()
+			open_inventory()
 		elif h == "map":
 			open_fullmap()
 		elif h.begins_with("slot"):
@@ -2100,27 +2663,35 @@ func drive(c: Dictionary, iv: Vector2, dt: float, maxspd: float) -> void:
 # =====================================================================
 func near_poi(r: float) -> Dictionary:
 	for p in Z.get("pois", []):
-		if p["kind"] != "terr" and dist(P, p) < r:
+		if p["kind"] != "terr" and p["kind"] != "van" and dist(P, p) < r:
 			return p
 	return {}
+
+
+func start_table(v: Dictionary) -> void:
+	search = {"kind": "table", "van": v, "t": 0.0, "need": 3.0, "label": "A RECOLHER O DINHEIRO"}
 
 
 func ctx_action() -> Dictionary:
 	if mode != "play":
 		return {}
 	if inside:
-		var c = near_cont()
-		if not c.is_empty():
-			if not search.is_empty():
-				return {"l": "A VASCULHAR…", "off": true}
-			if c["searched"]:
-				return {"l": "ABRIR", "f": func(): open_loot(c)}
-			return {"l": "VASCULHAR", "f": func(): start_search(c)}
-		return {}
+		return interior_action()
 	if not P["in_car"]:
+		if not search.is_empty():
+			return {"l": "…", "off": true}
+		var v = near_van()
+		if not v.is_empty():
+			if int(v["table"]) > 0 and Vector2(P["x"] - v["tx"], P["y"] - v["ty"]).length() < 2.6:
+				return {"l": "RECOLHER", "f": func(): start_table(v)}
+			if Vector2(P["x"] - v["nx"], P["y"] - v["ny"]).length() < 3.6:
+				return {"l": "VENDER", "f": func(): open_sell(v)}
 		var p = near_poi(4.3)
 		if not p.is_empty():
 			if p["kind"] == "heist":
+				var lock = heist_locked(p["id"])
+				if lock != "":
+					return {"l": "BLOQUEADO\n" + lock, "off": true}
 				var left = float(S["cds"].get(p["id"], 0)) - now_ms()
 				if left > 0:
 					return {"l": "FECHADO\n" + mmss(left), "off": true}
@@ -2158,7 +2729,7 @@ func busted() -> void:
 	S["money"] = int(S["money"]) - fine
 	S["inv"] = []
 	S["stats"]["busted"] = int(S["stats"]["busted"]) + 1
-	toast("Foste detido! Perdeste o saque e %s de multa" % fmt(fine), RED)
+	toast("Detido! Perdeste o saco e %s de multa" % fmt(fine), RED)
 	feed_add("Foste detido", RED)
 	go_home()
 
@@ -2169,7 +2740,7 @@ func hospital() -> void:
 	S["inv"] = []
 	S["hp"] = 100.0
 	S["stats"]["hospital"] = int(S["stats"]["hospital"]) + 1
-	toast("Acordaste no hospital. Conta: %s. Saque perdido." % fmt(fine), RED)
+	toast("Hospital: perdeste o saco e %s" % fmt(fine), RED)
 	feed_add("Hospital", RED)
 	go_home()
 
@@ -2190,7 +2761,12 @@ func shoot() -> void:
 	var w = weapon()
 	var tgt = {}
 	var best: float = w["range"]
-	for tt in police + gang:
+	var extra = []
+	if inside:
+		for cm in I["cams"]:
+			if cm["alive"]:
+				extra.append(cm)
+	for tt in police + gang + extra:
 		var d = dist(P, tt)
 		if d < best:
 			best = d
@@ -2324,6 +2900,15 @@ func update_game(dt: float) -> void:
 	if firing and P["fire_cd"] <= 0:
 		shoot()
 	update_life(dt)
+	update_vans(dt)
+	if not search.is_empty() and search["kind"] == "table":
+		var sv = search["van"]
+		if not P["in_car"] and Vector2(P["x"] - sv["tx"], P["y"] - sv["ty"]).length() < 3.0:
+			search["t"] = search["t"] + dt
+			if search["t"] >= search["need"]:
+				finish_search()
+		else:
+			search = {}
 	# polícia
 	var target = [0, 1, 2, 3, 4, 6][wanted]
 	if police.size() < target:
@@ -2429,6 +3014,28 @@ func update_game(dt: float) -> void:
 		var d2 = maxf(0.001, Vector2(dx2, dy2).length())
 		g["ang"] = atan2(dy2, dx2)
 		var moving = false
+		if g.has("van"):
+			var vv = g["van"]
+			var tdx: float = vv["tx"] - g["x"]
+			var tdy: float = vv["ty"] - g["y"]
+			var td = maxf(0.001, Vector2(tdx, tdy).length())
+			if int(vv["table"]) > 0:
+				if td > 1.8:
+					g["x"] = g["x"] + tdx / td * 5.0 * dt
+					g["y"] = g["y"] + tdy / td * 5.0 * dt
+					moving = true
+				else:
+					vv["table"] = 0
+					toast("Os rivais levaram o dinheiro da mesa!", RED)
+					feed_add("Roubaram-te a venda", RED)
+			if d2 < 20.0:
+				g["cd"] = g["cd"] - dt
+				if g["cd"] <= 0:
+					fire_bullet(g["x"], g["y"], g["ang"] + randf_range(-0.15, 0.15), "e", 6, 0.5)
+					g["cd"] = randf_range(0.9, 1.5)
+			g["moving"] = moving
+			g["shooting"] = d2 < 20.0 and not moving
+			continue
 		if d2 < 27.0:
 			if d2 > 12.0:
 				g["x"] = g["x"] + dx2 / d2 * 4.0 * dt
@@ -2448,7 +3055,8 @@ func update_game(dt: float) -> void:
 			boom(g["x"], g["y"], Color("#b04040"), 10)
 			g["mesh"].queue_free()
 			add_xp(10)
-			cleared[g["terr"]] = true
+			if g["terr"] != "":
+				cleared[g["terr"]] = true
 		else:
 			galive.append(g)
 	gang = galive
@@ -2519,6 +3127,7 @@ func update_act_button() -> void:
 	var lab = a.get("l", "—")
 	if lab != last_act:
 		last_act = lab
+		act_panel.visible = not a.is_empty()
 		act_lbl.text = lab
 		var on = a.has("f")
 		act_panel.add_theme_stylebox_override("panel", circle_style(Color(0.11, 0.12, 0.15, 0.85), GOLD if on else LINE))
@@ -2569,7 +3178,7 @@ func render(dt: float) -> void:
 		player_mesh.rotation.y = -P["ang"]
 		animate_char(player_mesh, P["phase"], mv, firing)
 	if inside and hostage_mesh and is_instance_valid(hostage_mesh):
-		animate_char(hostage_mesh, 0.0, 0.0, false, true)
+		animate_char(hostage_mesh, 0.0, 0.0, false, I["clerk"]["state"] in ["rendido", "amarrado"])
 	var flash = int(t * 8.0) % 2 == 0
 	var near_p = {}
 	var nd = 9999.0
@@ -2634,8 +3243,8 @@ func render(dt: float) -> void:
 		dd = 9.5
 		look_h = 1.3
 	if inside:
-		hgt = 7.5
-		dd = 4.8
+		hgt = 6.5
+		dd = 5.5
 		look_h = 0.9
 	var tgt = Vector3(P["x"], 0, P["y"])
 	if snap_cam:
@@ -2691,7 +3300,9 @@ func flat(bg: Color, radius = 12, border = LINE, bw = 1) -> StyleBoxFlat:
 
 
 func circle_style(bg: Color, border: Color) -> StyleBoxFlat:
-	return flat(bg, 200, border, 3)
+	var s = flat(bg, 56, border, 3)
+	s.corner_detail = 12
+	return s
 
 
 func pbar(col: Color, w = 150.0, h = 7.0) -> ProgressBar:
@@ -2848,6 +3459,7 @@ func setup_ui() -> void:
 	lbl_zone = lbl("", 15, DIM)
 	lbl_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	place(lbl_zone, 0.5, 0, -250, 96, 500, 22)
+	lbl_zone.visible = false
 	hud.add_child(lbl_zone)
 	prog_box = PanelContainer.new()
 	prog_box.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.85)))
@@ -3012,73 +3624,6 @@ func build_fullmap_ui(th: Theme) -> void:
 	ui.add_child(fullmap_ui)
 
 
-func build_loot_ui(th: Theme) -> void:
-	loot_ui = Control.new()
-	full(loot_ui)
-	loot_ui.theme = th
-	dark_bg(loot_ui, 0.75)
-	var hb = HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 16)
-	hb.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hb.offset_left = 30
-	hb.offset_top = 24
-	hb.offset_right = -30
-	hb.offset_bottom = -24
-	loot_ui.add_child(hb)
-	var left = PanelContainer.new()
-	left.add_theme_stylebox_override("panel", flat(Color("#23262d"), 6, Color("#3a3f49"), 1))
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(left)
-	var lv = VBoxContainer.new()
-	lv.add_theme_constant_override("separation", 10)
-	left.add_child(lv)
-	var lh = HBoxContainer.new()
-	loot_title = lbl("", 24, Color("#ecebe6"))
-	loot_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lh.add_child(loot_title)
-	loot_info = lbl("", 18, GOLD)
-	lh.add_child(loot_info)
-	lv.add_child(lh)
-	var ls = ScrollContainer.new()
-	ls.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	lv.add_child(ls)
-	loot_grid = GridContainer.new()
-	loot_grid.columns = 4
-	loot_grid.add_theme_constant_override("h_separation", 6)
-	loot_grid.add_theme_constant_override("v_separation", 6)
-	ls.add_child(loot_grid)
-	var take = ui_button("PEGAR TUDO", _loot_take_all, "g")
-	take.custom_minimum_size = Vector2(0, 52)
-	lv.add_child(take)
-	var right = PanelContainer.new()
-	right.add_theme_stylebox_override("panel", flat(Color("#23262d"), 6, Color("#3a3f49"), 1))
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.add_child(right)
-	var rv = VBoxContainer.new()
-	rv.add_theme_constant_override("separation", 10)
-	right.add_child(rv)
-	var rh = HBoxContainer.new()
-	var rt = lbl("SACO", 24)
-	rt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rh.add_child(rt)
-	loot_bag_info = lbl("", 18, GOLD)
-	rh.add_child(loot_bag_info)
-	rv.add_child(rh)
-	var rs = ScrollContainer.new()
-	rs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rv.add_child(rs)
-	bag_grid = GridContainer.new()
-	bag_grid.columns = 4
-	bag_grid.add_theme_constant_override("h_separation", 6)
-	bag_grid.add_theme_constant_override("v_separation", 6)
-	rs.add_child(bag_grid)
-	var close = ui_button("FECHAR", close_loot)
-	close.custom_minimum_size = Vector2(0, 52)
-	rv.add_child(close)
-	loot_ui.visible = false
-	ui.add_child(loot_ui)
-
-
 func build_modal_ui(th: Theme) -> void:
 	modal = Control.new()
 	full(modal)
@@ -3135,9 +3680,6 @@ func build_login_ui(th: Theme) -> void:
 	title.add_theme_constant_override("shadow_offset_x", 6)
 	title.add_theme_constant_override("shadow_offset_y", 6)
 	lvb.add_child(title)
-	var tag = lbl("Vila Rubra · crime em mundo aberto", 18, DIM)
-	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lvb.add_child(tag)
 	nick_edit = LineEdit.new()
 	nick_edit.placeholder_text = "Nome de jogador"
 	nick_edit.max_length = 16
@@ -3151,9 +3693,6 @@ func build_login_ui(th: Theme) -> void:
 	play.custom_minimum_size = Vector2(360, 60)
 	play.add_theme_font_size_override("font_size", 24)
 	lvb.add_child(play)
-	var ver = lbl("conteúdo %s · app %s" % [content_version, str(Engine.get_meta("app_version", "dev"))], 14, Color("#5d616b"))
-	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lvb.add_child(ver)
 	ui.add_child(login_ui)
 
 
@@ -3175,7 +3714,7 @@ func _on_play() -> void:
 	hud.visible = true
 	travel(func():
 		enter_place("home")
-		toast("Bem-vindo, %s. Conduz até à saída verde para abrir o mapa da região." % S["nick"]))
+		toast("Sai pela estrada (faixa verde) para abrir o mapa"))
 
 
 func travel(cb: Callable) -> void:
@@ -3257,17 +3796,17 @@ func refresh_hotbar() -> void:
 
 
 func update_hud() -> void:
-	lbl_money.text = fmt(S["money"])
+	lbl_money.text = fmt(bag_cash())
 	lbl_lvl.text = "Nível %d · %d/%d" % [S["lvl"], int(S["xp"]), xp_need(int(S["lvl"]))]
 	bar_xp.value = 100.0 * float(S["xp"]) / xp_need(int(S["lvl"]))
 	bar_hp.value = float(S["hp"])
 	bar_car.value = 100.0 * float(S["car_hp"]) / float(car_def()["hp"])
-	lbl_bag.text = "Saco %.1f/%dkg · %s" % [inv_kg(), bag_def()["cap"], fmt(inv_value())]
+	lbl_bag.text = "Saco %.1f / %d kg" % [inv_kg(), bag_def()["cap"]]
 	var st = (prog_bar.get_theme_stylebox("fill") as StyleBoxFlat)
 	if not search.is_empty():
 		prog_box.visible = true
-		prog_lbl.text = "A VASCULHAR: " + str(search["c"]["n"]).to_upper()
-		prog_bar.value = 100.0 * search["t"] / float(search["c"]["time"])
+		prog_lbl.text = search["label"]
+		prog_bar.value = 100.0 * search["t"] / float(search["need"])
 		st.bg_color = Color("#ecebe6")
 	elif inside and wanted > 0:
 		prog_box.visible = true
@@ -3399,7 +3938,7 @@ func _map_draw_world(ctl: Control, to_scr: Callable, s: float, view: Rect2) -> v
 
 
 func _draw_icon(ctl: Control, pos: Vector2, id: String, r: float) -> void:
-	var ic = D.ICONS.get(id, ["?", "#ffffff"])
+	var ic = D.ICONS.get("van" if id.begins_with("van") else id, ["?", "#ffffff"])
 	var col = Color(ic[1])
 	if D.TERRS.has(id) and S["terr"].has(id):
 		col = OK_C
@@ -3608,92 +4147,449 @@ func _draw_region() -> void:
 
 
 # =====================================================================
-#  JANELA DE SAQUE (inventário em grelha)
+#  ITENS E DINHEIRO (o dinheiro é um item no saco)
 # =====================================================================
-func item_tile(it: Dictionary, cb: Callable) -> Button:
+func item_def(id: String) -> Dictionary:
+	return D.ITEMS.get(id, {"n": id, "cat": "diversos", "kg": 0.0, "v": 0})
+
+
+func stack_kg(st: Dictionary) -> float:
+	if st["id"] == "cash":
+		return float(st["v"]) / 100000.0
+	return float(item_def(st["id"])["kg"]) * int(st["q"])
+
+
+func stack_value(st: Dictionary) -> int:
+	if st["id"] == "cash":
+		return int(st["v"])
+	return int(item_def(st["id"])["v"]) * int(st["q"])
+
+
+func inv_kg() -> float:
+	var s = 0.0
+	for st in S["inv"]:
+		s += stack_kg(st)
+	return s
+
+
+func inv_value() -> int:
+	var s = 0
+	for st in S["inv"]:
+		s += stack_value(st)
+	return s
+
+
+func bag_cash() -> int:
+	var s = 0
+	for st in S["inv"]:
+		if st["id"] == "cash":
+			s += int(st["v"])
+	return s
+
+
+func total_money() -> int:
+	return int(S["money"]) + bag_cash()
+
+
+func count_item(id: String) -> int:
+	var n = 0
+	for st in S["inv"]:
+		if st["id"] == id and st.has("q"):
+			n += int(st["q"])
+	return n
+
+
+func remove_item(id: String, q: int) -> void:
+	var keep = []
+	var left = q
+	for st in S["inv"]:
+		if st["id"] == id and st.has("q") and left > 0:
+			var take = mini(left, int(st["q"]))
+			st["q"] = int(st["q"]) - take
+			left -= take
+			if int(st["q"]) <= 0:
+				continue
+		keep.append(st)
+	S["inv"] = keep
+
+
+func add_stack(st: Dictionary) -> int:
+	## mete um item (ou dinheiro) no saco; devolve quantas unidades couberam
+	var cap = float(bag_def()["cap"])
+	if st["id"] == "cash":
+		var kg = float(st["v"]) / 100000.0
+		if inv_kg() + kg > cap + 0.001:
+			return 0
+		for s in S["inv"]:
+			if s["id"] == "cash":
+				s["v"] = int(s["v"]) + int(st["v"])
+				return int(st["v"])
+		S["inv"].insert(0, {"id": "cash", "v": int(st["v"])})
+		return int(st["v"])
+	var kg1 = float(item_def(st["id"])["kg"])
+	var room = cap - inv_kg()
+	var n = int(st["q"])
+	if kg1 > 0:
+		n = mini(n, int(floor((room + 0.0001) / kg1)))
+	if n <= 0:
+		return 0
+	for s in S["inv"]:
+		if s["id"] == st["id"]:
+			s["q"] = int(s["q"]) + n
+			return n
+	S["inv"].append({"id": st["id"], "q": n})
+	return n
+
+
+func take_cash(amount: int) -> void:
+	var left = amount
+	var keep = []
+	for st in S["inv"]:
+		if st["id"] == "cash" and left > 0:
+			var take = mini(left, int(st["v"]))
+			st["v"] = int(st["v"]) - take
+			left -= take
+			if int(st["v"]) <= 0:
+				continue
+		keep.append(st)
+	S["inv"] = keep
+
+
+func spend(amount: int) -> bool:
+	## paga primeiro com o dinheiro do saco e depois com o cofre
+	if total_money() < amount:
+		return false
+	var from_bag = mini(bag_cash(), amount)
+	take_cash(from_bag)
+	S["money"] = int(S["money"]) - (amount - from_bag)
+	return true
+
+
+func icon_tex(id: String):
+	var path = "res://game/icons/%s.png" % id
+	if not icon_cache.has(id):
+		icon_cache[id] = load(path) if ResourceLoader.exists(path) else null
+	return icon_cache[id]
+
+
+# =====================================================================
+#  JANELA DE ITENS: saque, inventário e venda (grelha de ícones)
+# =====================================================================
+func build_loot_ui(th: Theme) -> void:
+	loot_ui = Control.new()
+	full(loot_ui)
+	loot_ui.theme = th
+	dark_bg(loot_ui, 0.6)
+	var cc = CenterContainer.new()
+	full(cc)
+	loot_ui.add_child(cc)
+	var outer = VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 8)
+	cc.add_child(outer)
+	var hb = HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 12)
+	outer.add_child(hb)
+	for side in 2:
+		var pane = PanelContainer.new()
+		pane.add_theme_stylebox_override("panel", flat(Color(0.12, 0.13, 0.16, 0.97), 8, Color("#3a3f49"), 1))
+		pane.custom_minimum_size = Vector2(520, 470)
+		hb.add_child(pane)
+		var v = VBoxContainer.new()
+		v.add_theme_constant_override("separation", 8)
+		pane.add_child(v)
+		var h = HBoxContainer.new()
+		var title = lbl("", 20)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(title)
+		var info = lbl("", 17, GOLD)
+		h.add_child(info)
+		v.add_child(h)
+		var sc = ScrollContainer.new()
+		sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		v.add_child(sc)
+		var grid = GridContainer.new()
+		grid.columns = 5
+		grid.add_theme_constant_override("h_separation", 6)
+		grid.add_theme_constant_override("v_separation", 6)
+		sc.add_child(grid)
+		var btn = ui_button("", _loot_left_btn if side == 0 else close_loot, "g" if side == 0 else "")
+		btn.custom_minimum_size = Vector2(0, 48)
+		v.add_child(btn)
+		if side == 0:
+			loot_title = title
+			loot_info = info
+			loot_grid = grid
+			loot_btn = btn
+		else:
+			bag_title = title
+			loot_bag_info = info
+			bag_grid = grid
+			btn.text = "FECHAR"
+	var strip = HBoxContainer.new()
+	strip.add_theme_constant_override("separation", 10)
+	strip.alignment = BoxContainer.ALIGNMENT_CENTER
+	outer.add_child(strip)
+	loot_detail = lbl("", 17, Color("#ecebe6"))
+	strip.add_child(loot_detail)
+	loot_use = ui_button("USAR", _inv_use, "o")
+	loot_use.custom_minimum_size = Vector2(110, 40)
+	strip.add_child(loot_use)
+	loot_drop = ui_button("LARGAR", _inv_drop, "r")
+	loot_drop.custom_minimum_size = Vector2(110, 40)
+	strip.add_child(loot_drop)
+	loot_ui.visible = false
+	ui.add_child(loot_ui)
+
+
+func item_tile(st: Dictionary, cb: Callable, price = -1, selected = false) -> Button:
 	var b = Button.new()
-	b.custom_minimum_size = Vector2(118, 96)
-	var v = int(it["v"])
-	var bg = rarity_col(v)
-	var s = flat(bg, 4, bg.lightened(0.25), 1)
-	s.content_margin_left = 4
-	s.content_margin_right = 4
+	b.custom_minimum_size = Vector2(94, 94)
+	var unit = int(st["v"]) if st["id"] == "cash" else int(item_def(st["id"])["v"])
+	var bg = Color("#24402c") if st["id"] == "cash" else rarity_col(unit)
+	if item_def(st["id"])["cat"] == "historia":
+		bg = Color("#6a5a22")
+	var s = flat(bg, 5, GOLD if selected else bg.lightened(0.22), 3 if selected else 1)
 	b.add_theme_stylebox_override("normal", s)
 	b.add_theme_stylebox_override("hover", s)
-	b.add_theme_stylebox_override("pressed", flat(bg.lightened(0.15), 4, GOLD, 2))
+	b.add_theme_stylebox_override("pressed", flat(bg.lightened(0.15), 5, GOLD, 2))
 	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	b.add_theme_font_size_override("font_size", 13)
-	var nm: String = it["n"]
-	if nm.length() > 16:
-		nm = nm.substr(0, 15) + "…"
-	b.text = "%s\n%.1fkg\n%s" % [nm, float(it["kg"]), fmt(v)]
-	b.clip_text = true
+	var tex = icon_tex(st["id"])
+	if tex != null:
+		var tr = TextureRect.new()
+		tr.texture = tex
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tr.set_anchors_preset(Control.PRESET_FULL_RECT)
+		tr.offset_left = 14
+		tr.offset_top = 6
+		tr.offset_right = -14
+		tr.offset_bottom = -24
+		b.add_child(tr)
+	if st.has("q") and int(st["q"]) > 1:
+		var ql = lbl("×%d" % st["q"], 15, Color.WHITE)
+		ql.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		ql.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		ql.offset_right = -6
+		ql.offset_top = 2
+		ql.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+		b.add_child(ql)
+	var shown = price if price >= 0 else stack_value(st)
+	if shown > 0:
+		var vl = lbl(fmt(shown), 13, Color("#9be0a8") if price >= 0 else Color("#e8dfc8"))
+		vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		vl.offset_top = -22
+		vl.offset_bottom = -3
+		b.add_child(vl)
 	b.pressed.connect(cb)
 	return b
 
 
-func open_loot(c: Dictionary) -> void:
+func text_tile(top: String, bottom: String) -> PanelContainer:
+	var p = PanelContainer.new()
+	p.custom_minimum_size = Vector2(94, 94)
+	p.add_theme_stylebox_override("panel", flat(Color("#2a2e37"), 5, Color("#454b57"), 1))
+	var v = VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	var a = lbl(top, 13, Color("#ecebe6"))
+	a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	a.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(a)
+	var b = lbl(bottom, 12, DIM)
+	b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(b)
+	p.add_child(v)
+	return p
+
+
+func _open_grid(m: String) -> void:
 	mode = "loot"
+	loot_mode = m
+	inv_sel = -1
 	joy = {}
 	cam_drag = {}
 	firing = false
-	loot_c = c
 	refresh_loot()
 	loot_ui.visible = true
 
 
+func open_loot(c: Dictionary) -> void:
+	loot_c = c
+	_open_grid("loot")
+
+
+func open_inventory() -> void:
+	_open_grid("inv")
+
+
+func open_sell(v: Dictionary) -> void:
+	sell_van = v
+	_open_grid("sell")
+
+
+func clear_grid(g: GridContainer) -> void:
+	for ch in g.get_children():
+		g.remove_child(ch)
+		ch.queue_free()
+
+
 func refresh_loot() -> void:
-	for ch in loot_grid.get_children():
-		loot_grid.remove_child(ch)
-		ch.queue_free()
-	for ch in bag_grid.get_children():
-		bag_grid.remove_child(ch)
-		ch.queue_free()
-	if loot_c.is_empty():
+	clear_grid(loot_grid)
+	clear_grid(bag_grid)
+	loot_use.visible = false
+	loot_drop.visible = false
+	loot_detail.text = ""
+	bag_title.text = "SACO"
+	loot_bag_info.text = "%.1f / %d kg" % [inv_kg(), bag_def()["cap"]]
+	if loot_mode == "loot":
+		loot_title.text = str(loot_c["n"]).to_upper()
+		loot_btn.text = "PEGAR TUDO"
+		var tot = 0
+		var items: Array = loot_c["items"]
+		for i in items.size():
+			var idx = i
+			tot += stack_value(items[i])
+			loot_grid.add_child(item_tile(items[i], func(): _loot_take(idx)))
+		loot_info.text = fmt(tot) if tot > 0 else ""
+		for st in S["inv"]:
+			bag_grid.add_child(item_tile(st, func(): pass))
+	elif loot_mode == "sell":
+		var v = sell_van
+		loot_title.text = str(v["type"]["name"]).to_upper()
+		loot_info.text = "+30% " + D.CAT_NAMES[v["type"]["cat"]]
+		loot_btn.text = "VENDER TUDO"
+		for i in S["inv"].size():
+			var st = S["inv"][i]
+			var pr = van_price(st, v)
+			if pr <= 0:
+				continue
+			var idx2 = i
+			loot_grid.add_child(item_tile(st, func(): _sell_one(idx2), pr))
+		bag_title.text = "MESA"
+		loot_bag_info.text = fmt(v["table"])
+		if int(v["table"]) > 0:
+			bag_grid.add_child(item_tile({"id": "cash", "v": int(v["table"])}, func(): pass))
+		loot_detail.text = "O dinheiro fica na mesa: recolhe-o e foge."
+	else:
+		loot_title.text = "EQUIPAMENTO"
+		loot_info.text = "Cofre " + fmt(S["money"])
+		loot_btn.text = "OPÇÕES"
+		loot_grid.add_child(text_tile(weapon()["name"], "arma"))
+		loot_grid.add_child(text_tile(bag_def()["name"], "%d kg" % bag_def()["cap"]))
+		loot_grid.add_child(text_tile(car_def()["name"], "carro"))
+		for tl in D.TOOLS:
+			if has_tool(tl["id"]):
+				loot_grid.add_child(item_tile({"id": tl["id"], "q": 1}, func(): pass))
+		if int(S["ties"]) > 0:
+			loot_grid.add_child(item_tile({"id": "abracadeiras", "q": int(S["ties"])}, func(): pass))
+		for i in S["inv"].size():
+			var idx3 = i
+			bag_grid.add_child(item_tile(S["inv"][i], func(): _inv_select(idx3), -1, i == inv_sel))
+		if inv_sel >= 0 and inv_sel < S["inv"].size():
+			var st2 = S["inv"][inv_sel]
+			var it = item_def(st2["id"])
+			loot_detail.text = "%s · %.1f kg · %s" % [it["n"], stack_kg(st2), fmt(stack_value(st2))]
+			loot_use.visible = it.has("use")
+			loot_drop.visible = st2["id"] != "cash" or true
+
+
+func _inv_select(idx: int) -> void:
+	inv_sel = idx
+	refresh_loot()
+
+
+func _inv_use() -> void:
+	if inv_sel < 0 or inv_sel >= S["inv"].size():
 		return
-	loot_title.text = str(loot_c["n"]).to_upper()
-	var tot = 0
-	var items: Array = loot_c["items"]
-	for i in items.size():
-		var idx = i
-		tot += int(items[i]["v"])
-		loot_grid.add_child(item_tile(items[i], func(): _loot_take(idx)))
-	if items.is_empty():
-		loot_grid.add_child(lbl("Vazio", 18, DIM))
-	loot_info.text = fmt(tot)
-	for it in S["inv"]:
-		bag_grid.add_child(item_tile(it, func(): pass))
-	loot_bag_info.text = "%.1f/%dkg · %s" % [inv_kg(), bag_def()["cap"], fmt(inv_value())]
+	var st = S["inv"][inv_sel]
+	if item_def(st["id"]).get("use", "") == "heal":
+		S["hp"] = minf(100.0, float(S["hp"]) + 60.0)
+		remove_item(st["id"], 1)
+		toast("Vida recuperada", OK_C)
+	inv_sel = -1
+	refresh_loot()
+
+
+func _inv_drop() -> void:
+	if inv_sel < 0 or inv_sel >= S["inv"].size():
+		return
+	S["inv"].remove_at(inv_sel)
+	inv_sel = -1
+	refresh_loot()
+
+
+func _loot_left_btn() -> void:
+	if loot_mode == "loot":
+		_loot_take_all()
+	elif loot_mode == "sell":
+		_sell_all()
+	else:
+		close_loot()
+		menu_options()
 
 
 func _loot_take(idx: int) -> void:
 	var items: Array = loot_c["items"]
 	if idx >= items.size():
 		return
-	var it = items[idx]
-	if inv_kg() + float(it["kg"]) > float(bag_def()["cap"]):
-		toast("Saco cheio! Compra um saco maior no Armeiro", RED)
+	var st = items[idx]
+	var n = add_stack(st)
+	if n <= 0:
+		toast("Saco cheio", RED)
 		return
-	S["inv"].append(it)
-	items.remove_at(idx)
+	if st["id"] == "cash" or n >= int(st["q"]):
+		items.remove_at(idx)
+	else:
+		st["q"] = int(st["q"]) - n
+		toast("Saco cheio", RED)
 	refresh_loot()
 
 
 func _loot_take_all() -> void:
 	if loot_c.is_empty():
 		return
-	var items: Array = loot_c["items"]
 	var left = []
-	var full_bag = false
-	for it in items:
-		if inv_kg() + float(it["kg"]) <= float(bag_def()["cap"]):
-			S["inv"].append(it)
-		else:
-			left.append(it)
-			full_bag = true
+	for st in loot_c["items"]:
+		var n = add_stack(st)
+		if st["id"] == "cash":
+			if n <= 0:
+				left.append(st)
+		elif n < int(st["q"]):
+			st["q"] = int(st["q"]) - n
+			left.append(st)
 	loot_c["items"] = left
-	if full_bag:
-		toast("Saco cheio — ficaram itens para trás", RED)
+	if not left.is_empty():
+		toast("Saco cheio", RED)
+	refresh_loot()
+
+
+func _sell_one(idx: int) -> void:
+	if idx >= S["inv"].size():
+		return
+	var st = S["inv"][idx]
+	var pr = van_price(st, sell_van)
+	if pr <= 0:
+		return
+	S["inv"].remove_at(idx)
+	van_sold(sell_van, pr)
+	refresh_loot()
+
+
+func _sell_all() -> void:
+	var keep = []
+	var tot = 0
+	for st in S["inv"]:
+		var pr = van_price(st, sell_van)
+		if pr > 0:
+			tot += pr
+		else:
+			keep.append(st)
+	S["inv"] = keep
+	if tot > 0:
+		van_sold(sell_van, tot)
+		feed_add("Vendeste por " + fmt(tot), GOLD)
 	refresh_loot()
 
 
@@ -3702,6 +4598,7 @@ func close_loot() -> void:
 	loot_c = {}
 	if mode == "loot":
 		mode = "play"
+	last_act = "?"
 	save_game()
 
 
@@ -3731,6 +4628,7 @@ func close_menu() -> void:
 	if mode == "menu":
 		mode = "play"
 	refresh_hotbar()
+	last_act = "?"
 	save_game()
 
 
@@ -3749,22 +4647,27 @@ func h3(box: VBoxContainer, text: String) -> void:
 	box.add_child(l)
 
 
-func note(box: VBoxContainer, text: String, italic = false) -> void:
-	var l = lbl(text, 17, DIM)
+func note(box: VBoxContainer, text: String, bright = false) -> void:
+	var l = lbl(text, 17, Color("#d8d4ca") if bright else DIM)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	if italic:
-		l.add_theme_color_override("font_color", Color("#b9b6ad"))
 	box.add_child(l)
 
 
-func row(box: VBoxContainer, title: String, sub: String, btext: String, cb: Callable, kind = "", disabled = false) -> void:
+func row(box: VBoxContainer, title: String, sub: String, btext: String, cb: Callable, kind = "", disabled = false, icon = "") -> void:
 	var h = HBoxContainer.new()
 	h.add_theme_constant_override("separation", 12)
+	if icon != "" and icon_tex(icon) != null:
+		var tr = TextureRect.new()
+		tr.texture = icon_tex(icon)
+		tr.custom_minimum_size = Vector2(44, 44)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		h.add_child(tr)
 	var v = VBoxContainer.new()
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(lbl(title, 20))
+	v.add_child(lbl(title, 19))
 	if sub != "":
-		var s = lbl(sub, 15, DIM)
+		var s = lbl(sub, 14, DIM)
 		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(s)
 	h.add_child(v)
@@ -3775,37 +4678,8 @@ func row(box: VBoxContainer, title: String, sub: String, btext: String, cb: Call
 
 func big_button(box: VBoxContainer, text: String, cb: Callable, kind = "", disabled = false) -> void:
 	var b = ui_button(text, act(cb), kind, disabled)
-	b.custom_minimum_size = Vector2(0, 54)
+	b.custom_minimum_size = Vector2(0, 52)
 	box.add_child(b)
-
-
-func group_inv() -> Array:
-	var m = {}
-	var order = []
-	for i in S["inv"]:
-		var k: String = i["n"]
-		if not m.has(k):
-			m[k] = {"n": k, "c": 0, "v": 0, "kg": 0.0, "dirty": i.get("dirty", false)}
-			order.append(k)
-		m[k]["c"] += 1
-		m[k]["v"] += int(i["v"])
-		m[k]["kg"] += float(i["kg"])
-	var out = []
-	for k in order:
-		out.append(m[k])
-	return out
-
-
-func sell_val(g: Dictionary) -> int:
-	return int(floor(g["v"] * (0.8 if g["dirty"] else 1.0) * terr_bonus()))
-
-
-func remove_items(name: String) -> void:
-	var keep = []
-	for i in S["inv"]:
-		if i["n"] != name:
-			keep.append(i)
-	S["inv"] = keep
 
 
 func open_shop(id: String) -> void:
@@ -3821,75 +4695,101 @@ func open_shop(id: String) -> void:
 		open_menu("Esconderijo", menu_home)
 
 
+func story_advance() -> void:
+	var ch = int(S["story"])
+	var st = D.STORY[ch]
+	S["story"] = ch + 1
+	S["paid"] = 0
+	if int(st["cash"]) > 0:
+		add_money(st["cash"])
+	toast("Capítulo concluído: " + st["t"], GOLD)
+	feed_add("Desbloqueado: " + st["reward"], GOLD)
+
+
 func menu_bar(box: VBoxContainer) -> void:
-	note(box, "Zé Faísca, a limpar um copo: \"Traz-me coisas boas e eu arranjo comprador. Sem perguntas.\"", true)
-	h3(box, "Vender saque")
-	var gs = group_inv()
-	if gs.is_empty():
-		note(box, "O teu saco está vazio.")
+	var ch = int(S["story"])
+	if ch < D.STORY.size():
+		var st = D.STORY[ch]
+		h3(box, "Capítulo %d — %s" % [ch + 1, st["t"]])
+		note(box, st["txt"], true)
+		note(box, "Desbloqueia: " + st["reward"])
+		if st["item"] != "":
+			var has = count_item(st["item"]) > 0
+			row(box, item_def(st["item"])["n"], "No teu saco" if has else "Ainda não a tens", "Entregar", func():
+				remove_item(st["item"], 1)
+				story_advance(), "g", not has, st["item"])
+		else:
+			var left = int(st["pay"]) - int(S["paid"])
+			var can = mini(total_money(), left)
+			row(box, "Pago: %s de %s" % [fmt(S["paid"]), fmt(st["pay"])], "Faltam " + fmt(left), "Pagar " + fmt(can), func():
+				spend(can)
+				S["paid"] = int(S["paid"]) + can
+				if int(S["paid"]) >= int(st["pay"]):
+					story_advance(), "g", can <= 0, "cash")
 	else:
-		var tot = 0
-		for g in gs:
-			var v = sell_val(g)
-			tot += v
-			var nm: String = g["n"]
-			row(box, "%s ×%d" % [nm, g["c"]], "%.1fkg%s" % [g["kg"], " · lavagem 80%" if g["dirty"] else ""], fmt(v), func():
-				remove_items(nm)
-				add_money(v)
-				toast("+" + fmt(v), GOLD))
-		big_button(box, "Vender tudo · " + fmt(tot), func():
-			add_money(tot)
-			S["inv"] = []
-			feed_add("Vendeste saque: +" + fmt(tot), GOLD)
-			toast("Vendeste tudo: +" + fmt(tot), GOLD), "g")
-		if S["terr"].size() > 0:
-			note(box, "Bónus de território: +%d%% no preço" % int(round((terr_bonus() - 1.0) * 100)))
+		h3(box, "História concluída")
+		note(box, "«Vila Rubra é nossa.» Os contratos pagam agora a dobrar.", true)
 	h3(box, "Contrato")
 	var m = S["mission"]
 	if m.is_empty():
-		note(box, "O Zé tem sempre trabalho para quem não faz perguntas.")
 		big_button(box, "Pedir contrato", func():
 			var opts = []
 			for k in D.HEISTS.keys():
-				if D.HEISTS[k]["lvl"] <= int(S["lvl"]):
+				if heist_locked(k) == "":
 					opts.append(k)
 			var tg: String = opts[randi() % opts.size()]
 			var hh = D.HEISTS[tg]
-			S["mission"] = {"target": tg, "reward": 200 + hh["stars"] * 250 + int(S["lvl"]) * 60, "xp": hh["xp"], "done": false}
-			toast("Novo contrato: " + hh["name"]))
+			var rw = 2000 + int(hh["stars"]) * 2500 + int(S["lvl"]) * 600
+			if int(S["story"]) >= D.STORY.size():
+				rw *= 2
+			S["mission"] = {"target": tg, "reward": rw, "xp": hh["xp"], "done": false}
+			toast("Contrato: " + hh["name"]))
 	elif m["done"]:
-		row(box, "Feito: " + D.HEISTS[m["target"]]["name"], "Trabalho cumprido", "Receber " + fmt(m["reward"]), func():
+		row(box, D.HEISTS[m["target"]]["name"], "Trabalho feito", "Receber " + fmt(m["reward"]), func():
 			add_money(m["reward"])
 			add_xp(m["xp"])
 			S["mission"] = {}
-			toast("Recompensa: +" + fmt(m["reward"]), GOLD), "o")
+			toast("+" + fmt(m["reward"]) + " no cofre", GOLD), "o", false, "cash")
 	else:
-		row(box, "Assaltar: " + D.HEISTS[m["target"]]["name"], "Recompensa %s + %d XP" % [fmt(m["reward"]), m["xp"]], "Desistir", func(): S["mission"] = {})
+		row(box, "Assaltar: " + D.HEISTS[m["target"]]["name"], "Paga " + fmt(m["reward"]), "Desistir", func(): S["mission"] = {})
 
 
-func buy_row(box: VBoxContainer, it: Dictionary, owned: bool, equipped: bool, sub: String, on_buy: Callable, on_equip: Callable) -> void:
+func buy_row(box: VBoxContainer, it: Dictionary, owned: bool, equipped: bool, sub: String, on_buy: Callable, on_equip: Callable, icon = "") -> void:
 	if equipped:
-		row(box, it["name"], sub, "Equipado", func(): pass, "", true)
+		row(box, it["name"], sub, "Em uso", func(): pass, "", true, icon)
 	elif owned:
-		row(box, it["name"], sub, "Usar", on_equip, "o")
-	elif int(S["lvl"]) < int(it["lvl"]):
-		row(box, it["name"], sub, "Nível %d" % it["lvl"], func(): pass, "", true)
+		row(box, it["name"], sub, "Usar", on_equip, "o", false, icon)
+	elif int(S["story"]) < int(it.get("story", 0)):
+		row(box, it["name"], sub, "História", func(): pass, "", true, icon)
+	elif int(S["lvl"]) < int(it.get("lvl", 1)):
+		row(box, it["name"], sub, "Nível %d" % it["lvl"], func(): pass, "", true, icon)
 	else:
 		var price: int = it["price"]
 		row(box, it["name"], sub, fmt(price), func():
-			if int(S["money"]) < price:
+			if not spend(price):
 				return
-			S["money"] = int(S["money"]) - price
 			on_buy.call()
-			toast("Compraste " + it["name"], GOLD), "g", int(S["money"]) < price)
+			toast("Compraste: " + it["name"], GOLD), "g", total_money() < price, icon)
 
 
 func menu_arm(box: VBoxContainer) -> void:
-	note(box, "\"Aqui não há recibos.\" — Lima", true)
+	note(box, "Tens %s" % fmt(total_money()))
+	h3(box, "Ferramentas")
+	for tl in D.TOOLS:
+		var tid: String = tl["id"]
+		if tl.has("count"):
+			buy_row(box, tl, false, false, "%s · tens %d" % [tl["d"], int(S["ties"])], func(): S["ties"] = int(S["ties"]) + int(tl["count"]), func(): pass, "abracadeiras")
+		elif tl.has("item"):
+			buy_row(box, tl, false, false, tl["d"], func():
+				if add_stack({"id": tid, "q": 1}) <= 0:
+					add_money(tl["price"])
+					toast("Saco cheio", RED), func(): pass, tid)
+		else:
+			buy_row(box, tl, false, has_tool(tid), tl["d"], func(): S["tools"].append(tid), func(): pass, tid)
 	h3(box, "Armas")
 	for w in D.WEAPONS:
 		var wid: String = w["id"]
-		var sub = "Dano %d%s · %.1f tiros/s · alcance %dm" % [w["dmg"], ("×%d" % w["pel"]) if w["pel"] > 1 else "", 1.0 / w["rate"], int(w["range"])]
+		var sub = "Dano %d%s · %.1f tiros/s · %dm" % [w["dmg"], ("×%d" % w["pel"]) if w["pel"] > 1 else "", 1.0 / w["rate"], int(w["range"])]
 		buy_row(box, w, S["weapons"].has(wid), S["weapon"] == wid, sub, func():
 			S["weapons"].append(wid)
 			S["weapon"] = wid, func(): S["weapon"] = wid)
@@ -3897,22 +4797,22 @@ func menu_arm(box: VBoxContainer) -> void:
 	for b in D.BAGS:
 		var bid: String = b["id"]
 		var capb: int = b["cap"]
-		buy_row(box, b, S["bags"].has(bid), S["bag"] == bid, "Capacidade %dkg" % capb, func():
+		buy_row(box, b, S["bags"].has(bid), S["bag"] == bid, "%d kg" % capb, func():
 			S["bags"].append(bid)
 			S["bag"] = bid, func():
 			if inv_kg() > capb:
-				toast("Tens demasiado peso para esse saco", RED)
+				toast("Demasiado peso para esse saco", RED)
 				return
 			S["bag"] = bid)
 
 
 func menu_stand(box: VBoxContainer) -> void:
-	note(box, "\"Documentos? Vêm no próximo mês.\" — vendedor", true)
+	note(box, "Tens %s" % fmt(total_money()))
 	h3(box, "Carros")
 	for c in D.CARS:
 		var cid: String = c["id"]
 		var chp: float = c["hp"]
-		buy_row(box, c, S["cars"].has(cid), S["car"] == cid, "%s · vel %d km/h · resistência %d" % [c["d"], int(c["spd"] * 3.6), c["hp"]], func():
+		buy_row(box, c, S["cars"].has(cid), S["car"] == cid, "%s · %d km/h · resistência %d" % [c["d"], int(c["spd"] * 3.6), c["hp"]], func():
 			S["cars"].append(cid)
 			S["car"] = cid
 			S["car_hp"] = chp, func():
@@ -3920,11 +4820,11 @@ func menu_stand(box: VBoxContainer) -> void:
 			S["car_hp"] = chp)
 	h3(box, "Oficina")
 	var miss: float = float(car_def()["hp"]) - float(S["car_hp"])
-	var cost = int(ceil(miss * 4.0))
+	var cost = int(ceil(miss * 40.0))
 	row(box, "Reparar " + car_def()["name"], "%d/%d" % [int(S["car_hp"]), car_def()["hp"]], fmt(cost), func():
-		S["money"] = int(S["money"]) - cost
-		S["car_hp"] = float(car_def()["hp"])
-		toast("Carro reparado"), "", miss < 1 or int(S["money"]) < cost)
+		if spend(cost):
+			S["car_hp"] = float(car_def()["hp"])
+			toast("Carro reparado"), "", miss < 1 or total_money() < cost)
 
 
 func collect_button(box: VBoxContainer) -> void:
@@ -3932,11 +4832,11 @@ func collect_button(box: VBoxContainer) -> void:
 	big_button(box, "Recolher rendas · " + fmt(p), func():
 		add_money(p)
 		S["pending"] = float(S["pending"]) - p
-		toast("Rendas recolhidas: +" + fmt(p), GOLD), "o", p < 1)
+		toast("+" + fmt(p) + " no cofre", GOLD), "o", p < 1)
 
 
 func menu_imob(box: VBoxContainer) -> void:
-	note(box, "\"Compra, arrenda e deixa o dinheiro trabalhar.\"", true)
+	note(box, "Tens %s · rendimento %s/min" % [fmt(total_money()), fmt(income_rate())])
 	h3(box, "Imóveis")
 	for p in D.PROPS:
 		var pid: String = p["id"]
@@ -3948,46 +4848,43 @@ func menu_imob(box: VBoxContainer) -> void:
 				row(box, p["name"], sub, "Nível %d" % p["lvl"], func(): pass, "", true)
 			else:
 				row(box, p["name"], sub, fmt(price), func():
-					S["money"] = int(S["money"]) - price
-					S["props"][pid] = {"rented": false}
-					toast("Compraste " + p["name"], GOLD), "g", int(S["money"]) < price)
+					if spend(price):
+						S["props"][pid] = {"rented": false}
+						toast("Compraste: " + p["name"], GOLD), "g", total_money() < price)
 		elif S["props"][pid]["rented"]:
-			row(box, p["name"], sub + " · a render", "Arrendado ✓", func(): S["props"][pid]["rented"] = false)
+			row(box, p["name"], sub + " · a render", "Arrendado", func(): S["props"][pid]["rented"] = false)
 		else:
-			row(box, p["name"], sub + " · vazio", "Arrendar", func():
-				S["props"][pid]["rented"] = true
-				toast(p["name"] + " arrendado", GOLD), "o")
-	note(box, "Rendimento total: %s/min (inclui territórios)" % fmt(income_rate()))
+			row(box, p["name"], sub + " · vazio", "Arrendar", func(): S["props"][pid]["rented"] = true, "o")
 	collect_button(box)
 
 
 func menu_home(box: VBoxContainer) -> void:
-	note(box, "O teu canto. Aqui ninguém te encontra.", true)
-	big_button(box, "Descansar e reparar carro", func():
+	h3(box, "Cofre")
+	var bc = bag_cash()
+	row(box, fmt(S["money"]), "Dinheiro seguro. O que levas no saco perde-se se fores apanhado.", "Guardar " + fmt(bc), func():
+		take_cash(bc)
+		S["money"] = int(S["money"]) + bc
+		toast("Guardado no cofre", OK_C), "g", bc <= 0, "cash")
+	var take = mini(int(S["money"]), 50000)
+	row(box, "Levantar", "Passa dinheiro do cofre para o saco", fmt(take), func():
+		if add_stack({"id": "cash", "v": take}) > 0:
+			S["money"] = int(S["money"]) - take
+		else:
+			toast("Saco cheio", RED), "", take <= 0)
+	h3(box, "Casa")
+	big_button(box, "Descansar e reparar o carro", func():
 		S["hp"] = 100.0
 		S["car_hp"] = float(car_def()["hp"])
-		toast("Descansaste. Vida e carro a 100%", OK_C), "", float(S["hp"]) >= 100 and float(S["car_hp"]) >= float(car_def()["hp"]))
+		toast("Vida e carro a 100%", OK_C), "", float(S["hp"]) >= 100 and float(S["car_hp"]) >= float(car_def()["hp"]))
 	collect_button(box)
-	h3(box, "Estatísticas")
 	var st = S["stats"]
-	note(box, "Assaltos: %d · Detenções: %d · Hospital: %d\nTotal ganho: %s · Territórios: %d/3 · Imóveis: %d/4" % [st["heists"], st["busted"], st["hospital"], fmt(st["earned"]), S["terr"].size(), S["props"].size()])
+	note(box, "Assaltos %d · Detenções %d · Territórios %d/3 · Imóveis %d/4" % [st["heists"], st["busted"], S["terr"].size(), S["props"].size()])
 
 
-func menu_pause() -> void:
-	open_menu("Menu", func(box: VBoxContainer):
-		h3(box, "Saco")
-		var gs = group_inv()
-		if gs.is_empty():
-			note(box, "Vazio.")
-		for g in gs:
-			var nm: String = g["n"]
-			row(box, "%s ×%d" % [nm, g["c"]], "%.1fkg · vale ~%s" % [g["kg"], fmt(sell_val(g))], "Deitar fora", func(): remove_items(nm), "r")
-		h3(box, "Equipamento")
-		note(box, "Arma: %s · Carro: %s · Saco: %s" % [weapon()["name"], car_def()["name"], bag_def()["name"]])
-		h3(box, "Controlos")
-		note(box, "Esquerda: mover · Arrastar à direita: rodar a câmara · Toca no minimapa para o mapa da cidade.\nPara sair de um lugar, vai até uma saída verde na borda.")
-		h3(box, "Jogo")
-		note(box, "Jogador: %s · conteúdo %s" % [S["nick"], content_version])
+func menu_options() -> void:
+	open_menu("Opções", func(box: VBoxContainer):
+		note(box, "Esquerda: mover · Direita: rodar a câmara · Minimapa: mapa da cidade · Saída verde: mapa da região")
+		note(box, "%s · versão %s" % [S["nick"], content_version])
 		big_button(box, "Apagar progresso", func():
 			if now_ms() - reset_arm < 3000.0:
 				S = default_save()

@@ -28,7 +28,7 @@ func _ready() -> void:
 	http.request_completed.connect(_on_version)
 	var err := http.request(BASE + "version.json?t=%d" % int(Time.get_unix_time_from_system()))
 	if err != OK:
-		_start_game("Sem ligação — a jogar offline")
+		_start_game("")
 
 
 func _process(_delta: float) -> void:
@@ -37,7 +37,7 @@ func _process(_delta: float) -> void:
 		var got := http.get_downloaded_bytes()
 		if total > 0:
 			bar.value = 100.0 * got / total
-			status.text = "A descarregar atualização %s… %d%%" % [remote_content, int(bar.value)]
+			status.text = "A atualizar… %d%%" % int(bar.value)
 
 
 func _build_ui() -> void:
@@ -64,7 +64,7 @@ func _build_ui() -> void:
 	title.add_theme_constant_override("shadow_offset_y", 6)
 	v.add_child(title)
 	status = Label.new()
-	status.text = "A procurar atualizações…"
+	status.text = ""
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status.add_theme_color_override("font_color", Color("#9a9ca3"))
 	v.add_child(status)
@@ -89,13 +89,12 @@ func _build_ui() -> void:
 	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ver.add_theme_font_size_override("font_size", 15)
 	ver.add_theme_color_override("font_color", Color("#5d616b"))
-	v.add_child(ver)
 
 
 func _on_version(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	http.request_completed.disconnect(_on_version)
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		_start_game("Sem ligação ao servidor — a jogar offline")
+		_start_game("")
 		return
 	var j = JSON.parse_string(body.get_string_from_utf8())
 	if typeof(j) != TYPE_DICTIONARY or not j.has("content"):
@@ -106,17 +105,17 @@ func _on_version(result: int, code: int, _headers: PackedStringArray, body: Pack
 		app_btn.visible = true
 	remote_content = str(j["content"])
 	if _cmp(remote_content, _installed_version()) > 0:
-		status.text = "A descarregar atualização %s…" % remote_content
+		status.text = "A atualizar…"
 		http.download_file = PCK_NEW
 		http.request_completed.connect(_on_pck)
 		downloading = true
 		var err := http.request(BASE + "game.pck")
 		if err != OK:
 			downloading = false
-			_start_game("Falhou a atualização — a usar a versão atual")
+			_start_game("")
 	else:
 		bar.value = 100
-		_start_game("Jogo atualizado ✓")
+		_start_game("")
 
 
 func _on_pck(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
@@ -132,9 +131,9 @@ func _on_pck(result: int, code: int, _headers: PackedStringArray, _body: PackedB
 			f.store_string(remote_content)
 			f.close()
 		bar.value = 100
-		_start_game("Atualizado para %s ✓" % remote_content)
+		_start_game("")
 	else:
-		_start_game("Falhou a atualização — a usar a versão atual")
+		_start_game("")
 
 
 func _installed_version() -> String:
