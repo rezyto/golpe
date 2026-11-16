@@ -1,0 +1,88 @@
+name: GOLPE — compilar app e atualização
+on:
+  push:
+    branches: [main]
+    paths: ['jogo/**', '.github/workflows/build.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: build, cancel-in-progress: true }
+env:
+  GODOT_VER: "4.3"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Instalar Godot e templates de exportação
+        run: |
+          B=https://github.com/godotengine/godot/releases/download/${GODOT_VER}-stable
+          wget -q $B/Godot_v${GODOT_VER}-stable_linux.x86_64.zip
+          wget -q $B/Godot_v${GODOT_VER}-stable_export_templates.tpz
+          unzip -q Godot_v${GODOT_VER}-stable_linux.x86_64.zip
+          sudo mv Godot_v${GODOT_VER}-stable_linux.x86_64 /usr/local/bin/godot
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VER}.stable
+          unzip -q Godot_v${GODOT_VER}-stable_export_templates.tpz
+          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VER}.stable/
+      - name: Configurar Android (SDK, Java, chave)
+        run: |
+          mkdir -p ~/.config/godot
+          printf '%s\n' \
+            '[gd_resource type="EditorSettings" format=3]' '' '[resource]' \
+            "export/android/android_sdk_path = \"$ANDROID_SDK_ROOT\"" \
+            "export/android/java_sdk_path = \"$JAVA_HOME\"" \
+            "export/android/debug_keystore = \"$GITHUB_WORKSPACE/keys/golpe-test.keystore\"" \
+            'export/android/debug_keystore_user = "androiddebugkey"' \
+            'export/android/debug_keystore_pass = "android"' > ~/.config/godot/editor_settings-4.3.tres
+          cp ~/.config/godot/editor_settings-4.3.tres ~/.config/godot/editor_settings-4.tres
+          cat ~/.config/godot/editor_settings-4.3.tres
+      - name: Versões
+        id: v
+        run: |
+          CV="0.2.${{ github.run_number }}"
+          echo "$CV" > jogo/game/content_version.txt
+          AV=$(cat jogo/boot/app_version.txt)
+          sed -i "s/^version\/code=.*/version\/code=${{ github.run_number }}/; s/^version\/name=.*/version\/name=\"$AV\"/" jogo/export_presets.cfg
+          echo "cv=$CV" >> $GITHUB_OUTPUT
+          echo "av=$AV" >> $GITHUB_OUTPUT
+      - name: Importar projeto e verificar scripts
+        working-directory: jogo
+        run: |
+          timeout 300 godot --headless --editor --quit 2>&1 | tee import.log || true
+          FAIL=0
+          for f in $(find . -name '*.gd' -not -path './.godot/*'); do
+            OUT=$(timeout 60 godot --headless --check-only --script "$f" 2>&1 || true)
+            if echo "$OUT" | grep -qE "SCRIPT ERROR|Parse Error"; then echo "::error file=jogo/$f::Erros em $f"; echo "$OUT"; FAIL=1; else echo "OK $f"; fi
+          done
+          if grep -E "SCRIPT ERROR|Parse Error" import.log; then FAIL=1; fi
+          exit $FAIL
+      - name: Teste de arranque (headless)
+        working-directory: jogo
+        run: |
+          timeout 30 godot --headless --quit-after 300 res://game/main.tscn 2>&1 | tee run.log || true
+          if grep -E "SCRIPT ERROR|Parse Error" run.log; then exit 1; fi
+      - name: Exportar APK e pacote de atualização
+        working-directory: jogo
+        run: |
+          mkdir -p ../out
+          godot --headless --export-debug "Android" ../out/golpe.apk 2>&1 | tee export.log
+          godot --headless --export-pack "Android" ../out/game.pck 2>&1 | tee -a export.log
+          ls -la ../out
+          test -s ../out/golpe.apk && test -s ../out/game.pck
+          echo "{\"content\":\"${{ steps.v.outputs.cv }}\",\"app\":\"${{ steps.v.outputs.av }}\",\"date\":\"$(date -u +%F)\",\"commit\":\"${GITHUB_SHA::7}\"}" > ../out/version.json
+          cat ../out/version.json
+      - name: Publicar em Releases (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "GOLPE ${{ steps.v.outputs.cv }}"
+          body: |
+            Android: instala golpe.apk (só na primeira vez). Depois o jogo atualiza-se sozinho no ecrã de arranque.
+            Conteúdo ${{ steps.v.outputs.cv }} · app ${{ steps.v.outputs.av }}
+          files: |
+            out/golpe.apk
+            out/game.pck
+            out/version.json
+          make_latest: true
