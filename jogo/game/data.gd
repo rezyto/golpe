@@ -10,10 +10,10 @@ const WEAPONS := [
 ]
 
 const CARS := [
-	{"id": "pardal", "name": "Pardal", "price": 0, "spd": 20.0, "hp": 100, "col": "#d9a441", "lvl": 1, "d": "Pequeno e fiável"},
-	{"id": "mula", "name": "Furgão Mula", "price": 4000, "spd": 18.0, "hp": 190, "col": "#7d8a96", "lvl": 2, "d": "Lento mas aguenta pancada"},
-	{"id": "lince", "name": "Lince GT", "price": 12000, "spd": 27.0, "hp": 120, "col": "#c0392b", "lvl": 4, "d": "O mais rápido da cidade"},
-	{"id": "touro", "name": "Touro 4x4", "price": 25000, "spd": 23.5, "hp": 280, "col": "#2e6b4f", "lvl": 6, "d": "Rápido e blindado"},
+	{"id": "pardal", "name": "Pardal", "price": 0, "spd": 20.0, "hp": 100, "col": "#d9a441", "model": "car_hatchback", "lvl": 1, "d": "Pequeno e fiável"},
+	{"id": "mula", "name": "Furgão Mula", "price": 4000, "spd": 18.0, "hp": 190, "col": "#7d8a96", "model": "car_stationwagon", "lvl": 2, "d": "Lento mas aguenta pancada"},
+	{"id": "lince", "name": "Lince GT", "price": 12000, "spd": 27.0, "hp": 120, "col": "#c0392b", "model": "car_sedan", "lvl": 4, "d": "O mais rápido da cidade"},
+	{"id": "touro", "name": "Touro 4x4", "price": 25000, "spd": 23.5, "hp": 280, "col": "#2e6b4f", "model": "car_taxi", "lvl": 6, "d": "Rápido e blindado"},
 ]
 
 const BAGS := [

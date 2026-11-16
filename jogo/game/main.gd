@@ -465,7 +465,7 @@ func setup_3d() -> void:
 		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(p)
 		part_pool.append(p)
-	player_mesh = make_person("#2aa39a", "#2b3240", true, "#1f1f1f")
+	player_mesh = make_char("Rogue", true, "#2aa39a")
 	player_mesh.visible = false
 	add_child(player_mesh)
 
@@ -545,7 +545,20 @@ func cyl(r_top: float, r_bot: float, h: float, m: Material, pos: Vector3, parent
 	return mi
 
 
-func make_car(col: String, pol: bool) -> Node3D:
+func make_car(col: String, pol: bool, model = "") -> Node3D:
+	var kk = null
+	if pol:
+		kk = make_kaykit_car("car_police")
+	elif model != "":
+		kk = make_kaykit_car(model)
+	if kk:
+		if pol:
+			var lr0 = box(Vector3(0.35, 0.16, 0.55), unshaded(Color("#ff2a2a")), Vector3(-0.2, 2.0, 0.32), kk, false)
+			var lb0 = box(Vector3(0.35, 0.16, 0.55), unshaded(Color("#2a6aff")), Vector3(-0.2, 2.0, -0.32), kk, false)
+			kk.set_meta("lr", lr0)
+			kk.set_meta("lb", lb0)
+		kk.set_meta("col", col)
+		return kk
 	var g = Node3D.new()
 	var body = StandardMaterial3D.new()
 	body.albedo_color = Color(col)
@@ -578,6 +591,12 @@ func make_car(col: String, pol: bool) -> Node3D:
 
 func make_simple_car(col: String, parent: Node3D, pos: Vector3, ang: float) -> Node3D:
 	## carro estacionado/trânsito com menos peças (desempenho)
+	var kk = make_kaykit_car(CIV_CARS[randi() % CIV_CARS.size()])
+	if kk:
+		kk.position = pos
+		kk.rotation.y = -ang
+		parent.add_child(kk)
+		return kk
 	var g = Node3D.new()
 	box(Vector3(4.2, 0.8, 1.9), mat(col, 0.4, 0.3), Vector3(0, 0.75, 0), g)
 	box(Vector3(2.3, 0.6, 1.7), mat("#1b2633", 0.15, 0.6), Vector3(-0.25, 1.4, 0), g)
@@ -632,6 +651,201 @@ func animate_person(m: Node3D, phase: float, moving: bool, hands_up = false) -> 
 
 
 # =====================================================================
+#  MODELOS 3D (KayKit, CC0) — com modelos simples de reserva se faltarem
+# =====================================================================
+const CHAR_DIR = "res://assets/kaykit/chars/"
+const CITY_DIR = "res://assets/kaykit/city/"
+const CHAR_HIDE = {
+	"Rogue": ["Knife_Offhand", "1H_Crossbow", "2H_Crossbow", "Knife", "Throwable"],
+	"Rogue_Hooded": ["Knife_Offhand", "1H_Crossbow", "2H_Crossbow", "Knife", "Throwable"],
+	"Barbarian": ["1H_Axe_Offhand", "Barbarian_Round_Shield", "1H_Axe", "2H_Axe", "Mug", "Barbarian_Hat"],
+	"Mage": ["Spellbook", "Spellbook_open", "1H_Wand", "2H_Staff", "Mage_Hat"],
+}
+const LOOP_ANIMS = ["Idle", "Walking_A", "Running_A", "1H_Ranged_Aiming", "Sit_Floor_Idle", "Unarmed_Idle"]
+const CIV_CARS = ["car_hatchback", "car_sedan", "car_stationwagon", "car_taxi"]
+var model_cache = {}
+
+
+func scene_of(path: String):
+	if not model_cache.has(path):
+		model_cache[path] = load(path) if ResourceLoader.exists(path) else null
+	return model_cache[path]
+
+
+func has_models() -> bool:
+	return scene_of(CITY_DIR + "car_sedan.gltf") != null
+
+
+func make_char(model: String, armed: bool, fallback_shirt: String) -> Node3D:
+	var ps = scene_of(CHAR_DIR + model + ".glb")
+	if ps == null:
+		return make_person(fallback_shirt, "#2b3240", armed)
+	var pivot = Node3D.new()
+	var inst: Node3D = ps.instantiate()
+	inst.scale = Vector3.ONE * 0.82
+	inst.rotation.y = PI / 2
+	pivot.add_child(inst)
+	for nm in CHAR_HIDE.get(model, []):
+		var n = inst.find_child(nm, true, false)
+		if n:
+			n.visible = false
+	if armed:
+		var sks = inst.find_children("*", "Skeleton3D", true, false)
+		if sks.size() > 0:
+			var ba = BoneAttachment3D.new()
+			ba.bone_name = "handslot.r"
+			sks[0].add_child(ba)
+			box(Vector3(0.12, 0.18, 0.55), mat("#151515", 0.4, 0.6), Vector3(0, 0.05, 0.15), ba, false)
+	var aps = inst.find_children("*", "AnimationPlayer", true, false)
+	if aps.size() > 0:
+		var ap: AnimationPlayer = aps[0]
+		for an in LOOP_ANIMS:
+			if ap.has_animation(an):
+				ap.get_animation(an).loop_mode = Animation.LOOP_LINEAR
+		pivot.set_meta("ap", ap)
+		pivot.set_meta("cur", "")
+		play_anim(pivot, "Idle")
+	return pivot
+
+
+func play_anim(m: Node3D, an: String) -> void:
+	if not m.has_meta("ap"):
+		return
+	if m.get_meta("cur") == an:
+		return
+	var ap: AnimationPlayer = m.get_meta("ap")
+	if ap.has_animation(an):
+		ap.play(an, 0.2)
+		m.set_meta("cur", an)
+
+
+func animate_char(m: Node3D, phase: float, speed: float, shooting = false, hands_up = false) -> void:
+	if m.has_meta("ap"):
+		if hands_up:
+			play_anim(m, "Sit_Floor_Idle")
+		elif shooting:
+			play_anim(m, "1H_Ranged_Aiming")
+		elif speed > 4.0:
+			play_anim(m, "Running_A")
+		elif speed > 0.4:
+			play_anim(m, "Walking_A")
+		else:
+			play_anim(m, "Idle")
+	else:
+		animate_person(m, phase, speed > 0.4, hands_up)
+
+
+func set_vis_range(n: Node, v: float) -> void:
+	for gi in n.find_children("*", "GeometryInstance3D", true, false):
+		(gi as GeometryInstance3D).visibility_range_end = v
+
+
+func model_inst(file: String, scale_v: Vector3, rot_y: float, parent: Node3D, pos: Vector3, vis = 0.0) -> Node3D:
+	var ps = scene_of(CITY_DIR + file + ".gltf")
+	if ps == null:
+		return null
+	var inst: Node3D = ps.instantiate()
+	inst.scale = scale_v
+	inst.rotation.y = rot_y
+	inst.position = pos
+	parent.add_child(inst)
+	if vis > 0:
+		set_vis_range(inst, vis)
+	return inst
+
+
+func make_kaykit_car(file: String) -> Node3D:
+	var ps = scene_of(CITY_DIR + file + ".gltf")
+	if ps == null:
+		return null
+	var pivot = Node3D.new()
+	var inst: Node3D = ps.instantiate()
+	inst.scale = Vector3.ONE * 4.7
+	inst.rotation.y = PI / 2
+	pivot.add_child(inst)
+	return pivot
+
+
+func place_kaykit_building(b: Dictionary, parent: Node3D) -> void:
+	var w: float = b["w"]
+	var d: float = b["h"]
+	var face = int(b.get("face", 1))
+	var n = maxi(1, int(round(w / maxf(d, 4.0))))
+	var tw = w / n
+	var sz = d / 2.0
+	var maxh = 0.0
+	var r = RandomNumberGenerator.new()
+	r.seed = hash("%.1f,%.1f" % [b["x"], b["y"]])
+	for i in n:
+		var sx = tw / 2.0
+		var sy = (sx + sz) / 2.0 * (1.0 + r.randf() * 0.6)
+		var letter = "ABCDEFGH"[r.randi() % 8]
+		var cx: float = b["x"] + tw * (i + 0.5)
+		var cz: float = b["y"] + d / 2.0
+		model_inst("building_%s_withoutBase" % letter, Vector3(sx, sy, sz), 0.0 if face > 0 else PI, parent, Vector3(cx, 0.25, cz), 230.0)
+		maxh = maxf(maxh, 3.0 * sy)
+	b["hgt"] = maxh
+
+
+func place_street_props(r: RandomNumberGenerator) -> void:
+	var rw: float = Z["rw"]
+	var city = Z["kind"] == "city"
+	for y in Z["ry"]:
+		var x3 = 8.0
+		while x3 < Z["w"]:
+			var near3 = false
+			for xr in Z["rx"]:
+				if absf(x3 - xr) < rw + 3.0:
+					near3 = true
+			if city and x3 > 188.0 and x3 < 222.0:
+				near3 = true
+			if not near3:
+				for side in [-1.0, 1.0]:
+					model_inst("streetlight", Vector3.ONE * 5.0, -PI / 2 * side, world, Vector3(x3, 0.25, y + side * (rw + 0.8)), 170.0)
+			x3 += 18.0
+	for xr in Z["rx"]:
+		for yr in Z["ry"]:
+			model_inst("trafficlight_A", Vector3.ONE * 5.0, 0.0, world, Vector3(xr + rw + 0.9, 0.25, yr + rw + 0.9), 150.0)
+			model_inst("trafficlight_A", Vector3.ONE * 5.0, PI, world, Vector3(xr - rw - 0.9, 0.25, yr - rw - 0.9), 150.0)
+	var items = [["bench", 4.5], ["firehydrant", 4.0], ["trash_A", 4.0], ["dumpster", 4.0], ["bush", 4.5], ["bush", 4.5]]
+	var n = 80 if city else 18
+	var tries = 0
+	var placed = 0
+	while placed < n and tries < n * 6:
+		tries += 1
+		var horiz = r.randf() < 0.6
+		var side = 1.0 if r.randf() < 0.5 else -1.0
+		var px = 0.0
+		var py = 0.0
+		var rot = 0.0
+		if horiz:
+			py = Z["ry"][r.randi() % Z["ry"].size()] + side * (rw + 1.5)
+			px = 5.0 + r.randf() * (Z["w"] - 10.0)
+			rot = 0.0 if side > 0 else PI
+		else:
+			px = Z["rx"][r.randi() % Z["rx"].size()] + side * (rw + 1.5)
+			py = 5.0 + r.randf() * (Z["h"] - 10.0)
+			rot = PI / 2 * side
+		var ok = true
+		for xr in Z["rx"]:
+			if absf(px - xr) < rw + 3.0 and horiz:
+				ok = false
+		for yr in Z["ry"]:
+			if absf(py - yr) < rw + 3.0 and not horiz:
+				ok = false
+		if city and (py > 250.0 or (px > 186.0 and px < 224.0)):
+			ok = false
+		for p in Z["pois"]:
+			if Vector2(p["x"] - px, p["y"] - py).length() < 7.0:
+				ok = false
+		if not ok:
+			continue
+		var it = items[r.randi() % items.size()]
+		model_inst(it[0], Vector3.ONE * it[1], rot, world, Vector3(px, 0.25, py), 120.0)
+		placed += 1
+
+
+# =====================================================================
 #  GERAÇÃO: ZONAS PEQUENAS (casa, bar) E CIDADE
 # =====================================================================
 func base_zone(id: String, w: float, h: float, rw: float, rx: Array, ry: Array) -> Dictionary:
@@ -650,7 +864,7 @@ func fill_lot(z: Dictionary, r: RandomNumberGenerator, bx: float, by: float, bw:
 				break
 			var depth = minf(bh * (0.45 if rows.size() == 2 else 0.85), 8.0 + r.randf() * 9.0)
 			var y = by if top else by + bh - depth
-			z["blocks"].append({"x": cx, "y": y, "w": w - 1.1, "h": depth, "col": D.BPAL[r.randi() % D.BPAL.size()], "hgt": 5.0 + r.randf() * 18.0})
+			z["blocks"].append({"x": cx, "y": y, "w": w - 1.1, "h": depth, "col": D.BPAL[r.randi() % D.BPAL.size()], "hgt": 5.0 + r.randf() * 18.0, "face": -1 if top else 1})
 			cx += w
 	if rows.size() == 2:
 		for k in 3:
@@ -1029,6 +1243,13 @@ func build_world() -> void:
 					arms.append(Transform3D(Basis(), Vector3(x3, 4.4, pz - side * 0.55)))
 					bulbs.append(Transform3D(Basis(), Vector3(x3, 4.32, pz - side * 1.05)))
 			x3 += 18.0
+	if has_models():
+		poles = []
+		arms = []
+		bulbs = []
+		var rr0 = RandomNumberGenerator.new()
+		rr0.seed = hash(Z["id"]) + 99
+		place_street_props(rr0)
 	var pc = CylinderMesh.new()
 	pc.top_radius = 0.07
 	pc.bottom_radius = 0.09
@@ -1042,6 +1263,7 @@ func build_world() -> void:
 	bmesh.size = Vector3(0.3, 0.12, 0.45)
 	mm_add(world, bmesh, unshaded(Color("#fff1c2")), bulbs, false)
 	# prédios
+	var use_models = has_models()
 	for b in Z["blocks"]:
 		if b.get("water", false) or b.get("car", false):
 			continue
@@ -1053,6 +1275,9 @@ func build_world() -> void:
 		if b.get("crate", false):
 			var cr = box(Vector3(w, hgt, d), mat("#7a5f3c"), Vector3(bcx, hgt / 2.0 + 0.25, bcz), world)
 			cr.visibility_range_end = vis
+			continue
+		if not b.get("main", false) and use_models:
+			place_kaykit_building(b, world)
 			continue
 		var body = box(Vector3(w, hgt, d), facade(b["col"]), Vector3(bcx, hgt / 2.0 + 0.25, bcz), world)
 		body.visibility_range_end = vis + 60.0
@@ -1078,8 +1303,7 @@ func build_world() -> void:
 	# carros estacionados
 	for q in Z["parked"]:
 		var pcar = make_simple_car(q["col"], world, Vector3(q["cx"], 0, q["cy"]), q["ang"])
-		for ch in pcar.get_children():
-			(ch as GeometryInstance3D).visibility_range_end = vis
+		set_vis_range(pcar, vis)
 	# árvores (multimesh)
 	var trunks = []
 	var leaves = []
@@ -1192,7 +1416,7 @@ func enter_place(id: String) -> void:
 		P["y"] = car["y"]
 		P["ang"] = 0.0
 		cam_yaw = yaw_behind(0.0)
-	car["mesh"] = make_car(cd["col"], false)
+	car["mesh"] = make_car(cd["col"], false, cd.get("model", ""))
 	add_child(car["mesh"])
 	Z["spawn"] = {"x": P["x"], "y": P["y"]}
 	build_world()
@@ -1225,7 +1449,7 @@ func spawn_life() -> void:
 	civ = []
 	peds = []
 	var nc = 9 if Z["kind"] == "city" else 3
-	var np = 14 if Z["kind"] == "city" else 5
+	var np = 10 if Z["kind"] == "city" else 4
 	for i in nc:
 		spawn_civ(true)
 	for i in np:
@@ -1284,7 +1508,7 @@ func spawn_ped(first: bool) -> void:
 		p["x"] = v.x + side * off
 		p["y"] = v.y
 	var shirts = ["#c0392b", "#2e86c1", "#f1c40f", "#8e44ad", "#16a085", "#d35400", "#ecf0f1", "#34495e"]
-	var m = make_person(shirts[randi() % shirts.size()], ["#2b3240", "#4a3a2a", "#3a3a3a", "#1f2a44"][randi() % 4], false, ["#2a1d14", "#5a3a1a", "#111111", "#a0784a"][randi() % 4])
+	var m = make_char(["Barbarian", "Mage"][randi() % 2], false, shirts[randi() % shirts.size()])
 	world.add_child(m)
 	p["mesh"] = m
 	peds.append(p)
@@ -1366,10 +1590,10 @@ func update_life(dt: float) -> void:
 		var m2: Node3D = p["mesh"]
 		m2.position = Vector3(p["x"], 0.25, p["y"])
 		m2.rotation.y = -mv.angle()
-		animate_person(m2, p["phase"], true)
+		animate_char(m2, p["phase"], spd)
 		pk.append(p)
 	peds = pk
-	var np = 14 if Z["kind"] == "city" else 5
+	var np = 10 if Z["kind"] == "city" else 4
 	if peds.size() < np and randf() < dt * 3.0:
 		spawn_ped(false)
 
@@ -1495,7 +1719,7 @@ func build_interior() -> void:
 	ol.light_color = Color("#fff3dc")
 	world_int.add_child(ol)
 	# refém (mãos no ar)
-	hostage_mesh = make_person("#c9c9c9", "#2b3240", false, "#5a3a1a")
+	hostage_mesh = make_char("Mage", false, "#c9c9c9")
 	hostage_mesh.position = Vector3(def["hostage"][0], 0.0, def["hostage"][1])
 	hostage_mesh.rotation.y = -PI / 2
 	world_int.add_child(hostage_mesh)
@@ -1941,7 +2165,7 @@ func spawn_gang_for(p: Dictionary) -> void:
 	for k in n:
 		var a = float(k) / n * TAU
 		var rr = randf_range(6.5, 15.0)
-		var gm = make_person("#6a3a8a", "#2a2a33", true, "#111111")
+		var gm = make_char("Rogue_Hooded", true, "#6a3a8a")
 		add_child(gm)
 		gang.append({"x": p["x"] + cos(a) * rr, "y": p["y"] + sin(a) * rr, "hp": 40.0, "cd": randf_range(0.5, 1.5), "ang": 0.0, "mesh": gm, "phase": 0.0, "terr": p["id"]})
 	gang_spawned[p["id"]] = true
@@ -2120,6 +2344,7 @@ func update_game(dt: float) -> void:
 				g["cd"] = randf_range(0.9, 1.5)
 		push_out(g, 0.45)
 		g["moving"] = moving
+		g["shooting"] = d2 < 27.0
 	var galive = []
 	var cleared = {}
 	for g in gang:
@@ -2229,22 +2454,26 @@ func render(dt: float) -> void:
 		var cm: Node3D = car["mesh"]
 		if cm.get_meta("col") != cd["col"]:
 			cm.queue_free()
-			cm = make_car(cd["col"], false)
+			cm = make_car(cd["col"], false, cd.get("model", ""))
 			add_child(cm)
 			car["mesh"] = cm
 		cm.position = Vector3(car["x"], 0, car["y"])
 		cm.rotation.y = -car["ang"]
-		var body: StandardMaterial3D = cm.get_meta("body")
-		body.albedo_color = Color(cd["col"]) if float(S["car_hp"]) > 0 else Color("#2a2a2a")
+		var dead = float(S["car_hp"]) <= 0
+		if cm.get_meta("dead", false) != dead:
+			cm.set_meta("dead", dead)
+			var ov = unshaded(Color(0.04, 0.04, 0.04), 0.75) if dead else null
+			for mi in cm.find_children("*", "MeshInstance3D", true, false):
+				(mi as MeshInstance3D).material_overlay = ov
 	player_mesh.visible = not P["in_car"]
 	if not P["in_car"]:
 		var mv = Vector2(P["x"] - P["px"], P["y"] - P["py"]).length() / maxf(dt, 0.001)
 		P["phase"] = P["phase"] + mv * dt * 1.7
 		player_mesh.position = Vector3(P["x"], 0.25 if not inside else 0.0, P["y"])
 		player_mesh.rotation.y = -P["ang"]
-		animate_person(player_mesh, P["phase"], mv > 0.5)
+		animate_char(player_mesh, P["phase"], mv, firing)
 	if inside and hostage_mesh and is_instance_valid(hostage_mesh):
-		animate_person(hostage_mesh, 0.0, false, true)
+		animate_char(hostage_mesh, 0.0, 0.0, false, true)
 	var flash = int(t * 8.0) % 2 == 0
 	var near_p = {}
 	var nd = 9999.0
@@ -2269,7 +2498,7 @@ func render(dt: float) -> void:
 		g["phase"] = g["phase"] + (dt * 7.0 if g.get("moving", false) else 0.0)
 		gm.position = Vector3(g["x"], 0.25, g["y"])
 		gm.rotation.y = -g["ang"]
-		animate_person(gm, g["phase"], g.get("moving", false))
+		animate_char(gm, g["phase"], 4.5 if g.get("moving", false) else 0.0, g.get("shooting", false))
 	var base_h = 0.0 if inside else 0.25
 	for i in bullet_pool.size():
 		var bm: MeshInstance3D = bullet_pool[i]
