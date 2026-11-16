@@ -1,0 +1,14 @@
+{
+  "name": "golpe-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Casca Android do GOLPE: carrega o jogo do GitHub Pages, por isso atualiza sozinho.",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  }
+}

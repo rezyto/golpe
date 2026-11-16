@@ -1,0 +1,40 @@
+name: App Android (APK)
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Chave de assinatura fixa (permite atualizar sem desinstalar)
+        run: mkdir -p ~/.android && cp app/golpe-test.keystore ~/.android/debug.keystore
+      - name: Gerar projeto Android
+        working-directory: app
+        run: |
+          npm install
+          npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#14161b' --splashBackgroundColor '#14161b' || true
+          sed -i 's/<activity /<activity android:screenOrientation="sensorLandscape" /' android/app/src/main/AndroidManifest.xml
+          npx cap sync android
+      - name: Compilar APK
+        working-directory: app/android
+        run: ./gradlew assembleDebug --no-daemon
+      - id: v
+        run: echo "ver=$(node -p "require('./app/package.json').version")" >> $GITHUB_OUTPUT
+      - run: cp app/android/app/build/outputs/apk/debug/app-debug.apk golpe.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-v${{ steps.v.outputs.ver }}
+          name: GOLPE app ${{ steps.v.outputs.ver }}
+          body: "Instala o golpe.apk no Android. O jogo atualiza-se sozinho no ecrã de login."
+          files: golpe.apk
+          make_latest: true

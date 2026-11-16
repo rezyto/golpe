@@ -1,0 +1,11 @@
+<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#14161b;color:#ecebe6;font-family:system-ui}
+b{font-size:56px;color:#e8b931;letter-spacing:.12em;text-shadow:3px 3px 0 #6b1f1a}p{color:#9a9ca3}button{margin-top:10px;padding:12px 24px;border:0;border-radius:10px;background:#e8b931;font-weight:800}</style></head>
+<body><b>GOLPE</b><p id="m">A ligar ao servidor…</p><button id="r" style="display:none" onclick="go()">Tentar outra vez</button>
+<script>
+const SHELL='1.0.0',URL_JOGO='https://rezyto.github.io/golpe/?shell='+SHELL;
+function go(){document.getElementById('m').textContent='A ligar ao servidor…';document.getElementById('r').style.display='none';
+ fetch('https://rezyto.github.io/golpe/version.json?t='+Date.now(),{cache:'no-store'}).then(()=>location.replace(URL_JOGO))
+ .catch(()=>{document.getElementById('m').textContent='Sem internet. Liga-te para jogar.';document.getElementById('r').style.display='inline-block';});}
+go();
+</script></body></html>
