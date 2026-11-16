@@ -16,7 +16,7 @@ const PANEL := Color("#1d2027")
 const LINE := Color("#2c313b")
 
 var S: Dictionary = {}
-var mode := "login"
+var mode = "login"
 var Z: Dictionary = {}
 var world: Node3D
 var cam: Camera3D
@@ -53,7 +53,7 @@ var login_ui: Control
 var nick_edit: LineEdit
 var travel_ui: ColorRect
 
-var P := {"x": 0.0, "y": 0.0, "ang": 0.0, "in_car": false, "fire_cd": 0.0, "hurt": 0.0, "phase": 0.0, "px": 0.0, "py": 0.0}
+var P = {"x": 0.0, "y": 0.0, "ang": 0.0, "in_car": false, "fire_cd": 0.0, "hurt": 0.0, "phase": 0.0, "px": 0.0, "py": 0.0}
 var player_mesh: Node3D
 var car: Dictionary = {}
 var police: Array = []
@@ -62,24 +62,24 @@ var bullets: Array = []
 var parts: Array = []
 var bullet_pool: Array = []
 var part_pool: Array = []
-var wanted := 0
-var lost_t := 0.0
+var wanted = 0
+var lost_t = 0.0
 var heist: Dictionary = {}
-var bust := 0.0
-var cap := 0.0
-var spawn_t := 0.0
-var t := 0.0
-var cam_t := Vector3.ZERO
-var snap_cam := true
+var bust = 0.0
+var cap = 0.0
+var spawn_t = 0.0
+var t = 0.0
+var cam_t = Vector3.ZERO
+var snap_cam = true
 var joy: Dictionary = {}
-var firing := false
-var fire_touch := -99
-var last_act := ""
-var content_version := "dev"
+var firing = false
+var fire_touch = -99
+var last_act = ""
+var content_version = "dev"
 var mat_cache: Dictionary = {}
 var fac_cache: Dictionary = {}
-var save_t := 0.0
-var reset_arm := 0.0
+var save_t = 0.0
+var reset_arm = 0.0
 
 
 # =====================================================================
@@ -129,7 +129,7 @@ func load_game() -> void:
 
 func save_game() -> void:
 	S["last"] = now_ms()
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(S))
 		f.close()
@@ -137,9 +137,9 @@ func save_game() -> void:
 
 func offline_income() -> void:
 	var el: float = now_ms() - float(S["last"])
-	var r := income_rate()
+	var r = income_rate()
 	if r > 0 and el > 60000.0:
-		var add := r * minf(el, 8.0 * 3600000.0) / 60000.0
+		var add = r * minf(el, 8.0 * 3600000.0) / 60000.0
 		S["pending"] = float(S["pending"]) + add
 		toast("Enquanto estiveste fora: +%s em rendas por recolher" % fmt(add), GOLD)
 
@@ -191,14 +191,14 @@ func def_of(id: String) -> Dictionary:
 
 
 func inv_kg() -> float:
-	var s := 0.0
+	var s = 0.0
 	for i in S["inv"]:
 		s += float(i["kg"])
 	return s
 
 
 func income_rate() -> float:
-	var r := 0.0
+	var r = 0.0
 	for p in D.PROPS:
 		if S["props"].has(p["id"]) and S["props"][p["id"]]["rented"]:
 			r += p["rent"]
@@ -231,10 +231,10 @@ func add_money(n: float) -> void:
 
 
 func fmt(n) -> String:
-	var v := int(floor(float(n)))
-	var neg := v < 0
-	var s := str(absi(v))
-	var out := ""
+	var v = int(floor(float(n)))
+	var neg = v < 0
+	var s = str(absi(v))
+	var out = ""
 	while s.length() > 3:
 		out = " " + s.substr(s.length() - 3) + out
 		s = s.substr(0, s.length() - 3)
@@ -242,12 +242,12 @@ func fmt(n) -> String:
 
 
 func mmss(ms: float) -> String:
-	var s := int(ceil(ms / 1000.0))
+	var s = int(ceil(ms / 1000.0))
 	return "%d:%02d" % [s / 60, s % 60]
 
 
 func ang_diff(a: float, b: float) -> float:
-	var d := a - b
+	var d = a - b
 	while d > PI:
 		d -= TAU
 	while d < -PI:
@@ -263,9 +263,9 @@ func dist(a: Dictionary, b: Dictionary) -> float:
 #  3D: AMBIENTE, MATERIAIS, MODELOS
 # =====================================================================
 func setup_3d() -> void:
-	var env := Environment.new()
-	var sky := Sky.new()
-	var sm := ProceduralSkyMaterial.new()
+	var env = Environment.new()
+	var sky = Sky.new()
+	var sm = ProceduralSkyMaterial.new()
 	sm.sky_top_color = Color("#5f86bd")
 	sm.sky_horizon_color = Color("#e3cfae")
 	sm.ground_horizon_color = Color("#e3cfae")
@@ -279,7 +279,7 @@ func setup_3d() -> void:
 	env.fog_enabled = true
 	env.fog_light_color = Color("#cdbfa6")
 	env.fog_density = 0.005
-	var we := WorldEnvironment.new()
+	var we = WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 	sun = DirectionalLight3D.new()
@@ -298,10 +298,10 @@ func setup_3d() -> void:
 	siren.omni_range = 16.0
 	siren.light_energy = 0.0
 	add_child(siren)
-	var bm := unshaded(Color("#ffe28a"))
+	var bm = unshaded(Color("#ffe28a"))
 	for i in 60:
-		var b := MeshInstance3D.new()
-		var m := BoxMesh.new()
+		var b = MeshInstance3D.new()
+		var m = BoxMesh.new()
 		m.size = Vector3(0.7, 0.08, 0.08)
 		b.mesh = m
 		b.material_override = bm
@@ -310,8 +310,8 @@ func setup_3d() -> void:
 		add_child(b)
 		bullet_pool.append(b)
 	for i in 120:
-		var p := MeshInstance3D.new()
-		var s := SphereMesh.new()
+		var p = MeshInstance3D.new()
+		var s = SphereMesh.new()
 		s.radius = 0.14
 		s.height = 0.28
 		s.radial_segments = 6
@@ -328,10 +328,10 @@ func setup_3d() -> void:
 
 
 func mat(col: String, rough := 0.85, metal := 0.0) -> StandardMaterial3D:
-	var k := "%s|%s|%s" % [col, rough, metal]
+	var k = "%s|%s|%s" % [col, rough, metal]
 	if mat_cache.has(k):
 		return mat_cache[k]
-	var m := StandardMaterial3D.new()
+	var m = StandardMaterial3D.new()
 	m.albedo_color = Color(col)
 	m.roughness = rough
 	m.metallic = metal
@@ -340,7 +340,7 @@ func mat(col: String, rough := 0.85, metal := 0.0) -> StandardMaterial3D:
 
 
 func unshaded(c: Color, alpha := 1.0) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
+	var m = StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.albedo_color = Color(c.r, c.g, c.b, alpha)
 	if alpha < 1.0:
@@ -351,21 +351,21 @@ func unshaded(c: Color, alpha := 1.0) -> StandardMaterial3D:
 func facade(col: String) -> StandardMaterial3D:
 	if fac_cache.has(col):
 		return fac_cache[col]
-	var base := Color(col)
-	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var base = Color(col)
+	var img = Image.create(64, 64, false, Image.FORMAT_RGBA8)
 	img.fill(base)
 	img.fill_rect(Rect2i(0, 0, 64, 3), base.darkened(0.25))
-	var rng := RandomNumberGenerator.new()
+	var rng = RandomNumberGenerator.new()
 	rng.seed = hash(col)
 	for i in 2:
-		var x := 6 + i * 32
+		var x = 6 + i * 32
 		img.fill_rect(Rect2i(x - 1, 15, 22, 34), base.darkened(0.45))
-		var lit := rng.randf() < 0.3
+		var lit = rng.randf() < 0.3
 		img.fill_rect(Rect2i(x, 16, 20, 32), Color("#f2d38a") if lit else Color("#5b7590"))
 		img.fill_rect(Rect2i(x, 16, 20, 7), Color("#fbe7b5") if lit else Color("#7f98b0"))
 		img.fill_rect(Rect2i(x - 2, 48, 24, 3), base.darkened(0.3))
-	var tex := ImageTexture.create_from_image(img)
-	var m := StandardMaterial3D.new()
+	var tex = ImageTexture.create_from_image(img)
+	var m = StandardMaterial3D.new()
 	m.albedo_texture = tex
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
@@ -376,8 +376,8 @@ func facade(col: String) -> StandardMaterial3D:
 
 
 func box(size: Vector3, m: Material, pos: Vector3, parent: Node3D, shadow := true) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
+	var mi = MeshInstance3D.new()
+	var bm = BoxMesh.new()
 	bm.size = size
 	mi.mesh = bm
 	mi.material_override = m
@@ -388,8 +388,8 @@ func box(size: Vector3, m: Material, pos: Vector3, parent: Node3D, shadow := tru
 
 
 func cyl(r_top: float, r_bot: float, h: float, m: Material, pos: Vector3, parent: Node3D, segs := 8) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var cm := CylinderMesh.new()
+	var mi = MeshInstance3D.new()
+	var cm = CylinderMesh.new()
 	cm.top_radius = r_top
 	cm.bottom_radius = r_bot
 	cm.height = h
@@ -403,8 +403,8 @@ func cyl(r_top: float, r_bot: float, h: float, m: Material, pos: Vector3, parent
 
 
 func make_car(col: String, pol: bool) -> Node3D:
-	var g := Node3D.new()
-	var body := StandardMaterial3D.new()
+	var g = Node3D.new()
+	var body = StandardMaterial3D.new()
 	body.albedo_color = Color(col)
 	body.roughness = 0.35
 	body.metallic = 0.35
@@ -415,19 +415,19 @@ func make_car(col: String, pol: bool) -> Node3D:
 	var wheels: Array = []
 	for sx in [1.35, -1.35]:
 		for sz in [0.9, -0.9]:
-			var w := cyl(0.37, 0.37, 0.32, mat("#17181a"), Vector3(sx, 0.37, sz), g, 10)
+			var w = cyl(0.37, 0.37, 0.32, mat("#17181a"), Vector3(sx, 0.37, sz), g, 10)
 			w.rotation.x = PI / 2
 			wheels.append(w)
-	var head := unshaded(Color("#fff3c4"))
+	var head = unshaded(Color("#fff3c4"))
 	box(Vector3(0.06, 0.16, 0.42), head, Vector3(2.13, 0.82, 0.62), g, false)
 	box(Vector3(0.06, 0.16, 0.42), head, Vector3(2.13, 0.82, -0.62), g, false)
-	var tail := unshaded(Color("#d4352b"))
+	var tail = unshaded(Color("#d4352b"))
 	box(Vector3(0.06, 0.16, 0.36), tail, Vector3(-2.13, 0.82, 0.65), g, false)
 	box(Vector3(0.06, 0.16, 0.36), tail, Vector3(-2.13, 0.82, -0.65), g, false)
 	if pol:
 		box(Vector3(2.4, 0.22, 1.93), mat("#1f3a7a"), Vector3(0.2, 0.68, 0), g, false)
-		var lr := box(Vector3(0.35, 0.18, 0.55), unshaded(Color("#ff2a2a")), Vector3(-0.3, 1.86, 0.32), g, false)
-		var lb := box(Vector3(0.35, 0.18, 0.55), unshaded(Color("#2a6aff")), Vector3(-0.3, 1.86, -0.32), g, false)
+		var lr = box(Vector3(0.35, 0.18, 0.55), unshaded(Color("#ff2a2a")), Vector3(-0.3, 1.86, 0.32), g, false)
+		var lb = box(Vector3(0.35, 0.18, 0.55), unshaded(Color("#2a6aff")), Vector3(-0.3, 1.86, -0.32), g, false)
 		g.set_meta("lr", lr)
 		g.set_meta("lb", lb)
 	g.set_meta("body", body)
@@ -436,10 +436,10 @@ func make_car(col: String, pol: bool) -> Node3D:
 
 
 func make_person(shirt: String, pants: String, armed: bool) -> Node3D:
-	var g := Node3D.new()
+	var g = Node3D.new()
 	var legs: Array = []
 	for s in [-0.15, 0.15]:
-		var piv := Node3D.new()
+		var piv = Node3D.new()
 		piv.position = Vector3(0, 0.9, s)
 		g.add_child(piv)
 		box(Vector3(0.24, 0.9, 0.24), mat(pants), Vector3(0, -0.45, 0), piv)
@@ -448,7 +448,7 @@ func make_person(shirt: String, pants: String, armed: bool) -> Node3D:
 	box(Vector3(0.36, 0.72, 0.62), mat(shirt), Vector3(0, 1.26, 0), g)
 	var arms: Array = []
 	for s in [-0.4, 0.4]:
-		var piv := Node3D.new()
+		var piv = Node3D.new()
 		piv.position = Vector3(0, 1.56, s)
 		g.add_child(piv)
 		box(Vector3(0.2, 0.66, 0.2), mat(shirt), Vector3(0, -0.3, 0), piv)
@@ -466,7 +466,7 @@ func make_person(shirt: String, pants: String, armed: bool) -> Node3D:
 func animate_person(m: Node3D, phase: float, moving: bool) -> void:
 	var legs: Array = m.get_meta("legs")
 	var arms: Array = m.get_meta("arms")
-	var a := sin(phase) * 0.65 if moving else 0.0
+	var a = sin(phase) * 0.65 if moving else 0.0
 	legs[0].rotation.z = a
 	legs[1].rotation.z = -a
 	arms[0].rotation.z = -a * 0.8
@@ -477,16 +477,16 @@ func animate_person(m: Node3D, phase: float, moving: bool) -> void:
 #  ZONAS (cidade gerada por zona)
 # =====================================================================
 func make_zone(id: String) -> Dictionary:
-	var r := RandomNumberGenerator.new()
+	var r = RandomNumberGenerator.new()
 	r.seed = hash(id)
-	var kind := kind_of(id)
-	var def := def_of(id)
-	var z := {"id": id, "kind": kind, "def": def, "blocks": [], "lots": [], "trees": [], "door": {}, "flag": {}, "armed": false, "cleared": false, "spawn": {}}
-	var xs := [[0.0, RX[0] - RW], [RX[0] + RW, RX[1] - RW], [RX[1] + RW, ZW]]
-	var ys := [[0.0, RY[0] - RW], [RY[0] + RW, RY[1] - RW], [RY[1] + RW, ZH]]
+	var kind = kind_of(id)
+	var def = def_of(id)
+	var z = {"id": id, "kind": kind, "def": def, "blocks": [], "lots": [], "trees": [], "door": {}, "flag": {}, "armed": false, "cleared": false, "spawn": {}}
+	var xs = [[0.0, RX[0] - RW], [RX[0] + RW, RX[1] - RW], [RX[1] + RW, ZW]]
+	var ys = [[0.0, RY[0] - RW], [RY[0] + RW, RY[1] - RW], [RY[1] + RW, ZH]]
 	for i in 3:
 		for j in 3:
-			var lot := {"x": xs[i][0], "y": ys[j][0], "w": xs[i][1] - xs[i][0], "h": ys[j][1] - ys[j][0]}
+			var lot = {"x": xs[i][0], "y": ys[j][0], "w": xs[i][1] - xs[i][0], "h": ys[j][1] - ys[j][0]}
 			z["lots"].append(lot)
 			var bx: float = lot["x"] + 2.0
 			var by: float = lot["y"] + 2.0
@@ -496,36 +496,36 @@ func make_zone(id: String) -> Dictionary:
 				if kind == "terr":
 					z["flag"] = {"x": bx + bw / 2.0, "y": by + bh / 2.0}
 					for k in 8:
-						var cx := bx + 3.0 + r.randf() * (bw - 9.0)
-						var cy := by + 3.0 + r.randf() * (bh - 7.0)
+						var cx = bx + 3.0 + r.randf() * (bw - 9.0)
+						var cy = by + 3.0 + r.randf() * (bh - 7.0)
 						if Vector2(cx - z["flag"]["x"], cy - z["flag"]["y"]).length() < 8.0:
 							continue
 						z["blocks"].append({"x": cx, "y": cy, "w": 3.0 + r.randf() * 2.5, "h": 2.4 + r.randf() * 2.0, "col": "#7a5f3c", "crate": true, "hgt": 1.4 + r.randf() * 0.8})
 				else:
-					var tw := minf(bw, 43.0 if id == "museu" else 36.0)
-					var th := minf(bh, 24.0)
-					var tx := bx + (bw - tw) / 2.0
-					var ty := by + bh - th - 2.5
+					var tw = minf(bw, 43.0 if id == "museu" else 36.0)
+					var th = minf(bh, 24.0)
+					var tx = bx + (bw - tw) / 2.0
+					var ty = by + bh - th - 2.5
 					z["blocks"].append({"x": tx, "y": ty, "w": tw, "h": th, "col": def["col"], "label": def["name"], "main": true, "hgt": 11.0 if kind == "heist" else 8.0})
 					z["door"] = {"x": tx + tw / 2.0, "y": ty + th + 0.7}
 					for k in 7:
 						z["trees"].append({"x": bx + 2.0 + r.randf() * (bw - 4.0), "y": by + 1.5 + r.randf() * maxf(1.0, ty - by - 3.0), "r": 1.1 + r.randf() * 0.8})
 				continue
-			var cx2 := bx
+			var cx2 = bx
 			while cx2 < bx + bw - 3.5:
-				var w := minf(bx + bw - cx2, 6.5 + r.randf() * 12.0)
+				var w = minf(bx + bw - cx2, 6.5 + r.randf() * 12.0)
 				if w < 3.5:
 					break
-				var h := bh * (0.5 + r.randf() * 0.5)
-				var y := by if r.randf() < 0.5 else by + bh - h
+				var h = bh * (0.5 + r.randf() * 0.5)
+				var y = by if r.randf() < 0.5 else by + bh - h
 				z["blocks"].append({"x": cx2, "y": y, "w": w - 1.1, "h": h, "col": D.BPAL[r.randi() % D.BPAL.size()], "hgt": 5.0 + r.randf() * 16.0})
 				if r.randf() < 0.6:
-					var ty2 := by + h + 1.4 if y == by else y - 1.4
+					var ty2 = by + h + 1.4 if y == by else y - 1.4
 					z["trees"].append({"x": cx2 + w / 2.0, "y": ty2, "r": 0.9 + r.randf() * 0.6})
 				cx2 += w
 	var keep: Array = []
 	for tr in z["trees"]:
-		var bad := false
+		var bad = false
 		for b in z["blocks"]:
 			if tr["x"] > b["x"] - 0.6 and tr["x"] < b["x"] + b["w"] + 0.6 and tr["y"] > b["y"] - 0.6 and tr["y"] < b["y"] + b["h"] + 0.6:
 				bad = true
@@ -537,21 +537,21 @@ func make_zone(id: String) -> Dictionary:
 
 
 func push_out(o: Dictionary, rad: float) -> bool:
-	var hit := false
+	var hit = false
 	for b in Z["blocks"]:
 		var bx: float = b["x"]
 		var by: float = b["y"]
 		var bw: float = b["w"]
 		var bh: float = b["h"]
-		var cx := clampf(o["x"], bx, bx + bw)
-		var cy := clampf(o["y"], by, by + bh)
+		var cx = clampf(o["x"], bx, bx + bw)
+		var cy = clampf(o["y"], by, by + bh)
 		var dx: float = o["x"] - cx
 		var dy: float = o["y"] - cy
-		var d2 := dx * dx + dy * dy
+		var d2 = dx * dx + dy * dy
 		if d2 < rad * rad:
 			hit = true
 			if d2 > 0.000001:
-				var d := sqrt(d2)
+				var d = sqrt(d2)
 				o["x"] = cx + dx / d * rad
 				o["y"] = cy + dy / d * rad
 			else:
@@ -559,7 +559,7 @@ func push_out(o: Dictionary, rad: float) -> bool:
 				var rr: float = bx + bw - o["x"]
 				var tt: float = o["y"] - by
 				var bb: float = by + bh - o["y"]
-				var m := minf(minf(l, rr), minf(tt, bb))
+				var m = minf(minf(l, rr), minf(tt, bb))
 				if m == l:
 					o["x"] = bx - rad
 				elif m == rr:
@@ -586,34 +586,34 @@ func build_world() -> void:
 	ring = null
 	cloth = null
 	# chão
-	var ground := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
+	var ground = MeshInstance3D.new()
+	var pm = PlaneMesh.new()
 	pm.size = Vector2(ZW + 260, ZH + 260)
 	ground.mesh = pm
 	ground.material_override = mat("#4b6640")
 	ground.position = Vector3(ZW / 2.0, -0.02, ZH / 2.0)
 	world.add_child(ground)
 	# estradas
-	var asphalt := mat("#2f3238", 0.95)
+	var asphalt = mat("#2f3238", 0.95)
 	for y in RY:
 		box(Vector3(ZW + 260, 0.04, RW * 2.0), asphalt, Vector3(ZW / 2.0, 0.0, y), world, false)
 	for x in RX:
 		box(Vector3(RW * 2.0, 0.045, ZH + 260), asphalt, Vector3(x, 0.002, ZH / 2.0), world, false)
 	# passeios e relva
-	var li := 0
+	var li = 0
 	for l in Z["lots"]:
 		var cx: float = l["x"] + l["w"] / 2.0
 		var cz: float = l["y"] + l["h"] / 2.0
 		box(Vector3(l["w"], 0.25, l["h"]), mat("#a8a398"), Vector3(cx, 0.125, cz), world, false)
-		var inner := mat("#6a6152") if (Z["kind"] == "terr" and li == 4) else mat("#587a48")
+		var inner = mat("#6a6152") if (Z["kind"] == "terr" and li == 4) else mat("#587a48")
 		box(Vector3(l["w"] - 2.0, 0.27, l["h"] - 2.0), inner, Vector3(cx, 0.135, cz), world, false)
 		li += 1
 	# marcas na estrada (multimesh)
 	var dash_list: Array = []
 	for y in RY:
-		var x := -120.0
+		var x = -120.0
 		while x < ZW + 120.0:
-			var near := false
+			var near = false
 			for rx in RX:
 				if absf(x - rx) < RW + 1.5:
 					near = true
@@ -621,9 +621,9 @@ func build_world() -> void:
 				dash_list.append(Transform3D(Basis(), Vector3(x, 0.03, y)))
 			x += 3.4
 	for xr in RX:
-		var y2 := -120.0
+		var y2 = -120.0
 		while y2 < ZH + 120.0:
-			var near2 := false
+			var near2 = false
 			for ry in RY:
 				if absf(y2 - ry) < RW + 1.5:
 					near2 = true
@@ -637,21 +637,21 @@ func build_world() -> void:
 				dash_list.append(Transform3D(Basis(Vector3.UP, PI / 2).scaled(Vector3(0.7, 1, 0.3)), Vector3(xr + k * 1.0, 0.03, yr + RW + 1.1)))
 				dash_list.append(Transform3D(Basis().scaled(Vector3(0.7, 1, 0.3)), Vector3(xr - RW - 1.1, 0.03, yr + k * 1.0)))
 				dash_list.append(Transform3D(Basis().scaled(Vector3(0.7, 1, 0.3)), Vector3(xr + RW + 1.1, 0.03, yr + k * 1.0)))
-	var mm := MultiMesh.new()
+	var mm = MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
-	var dm := BoxMesh.new()
+	var dm = BoxMesh.new()
 	dm.size = Vector3(1.8, 0.02, 0.22)
 	mm.mesh = dm
 	mm.instance_count = dash_list.size()
 	for i in dash_list.size():
 		mm.set_instance_transform(i, dash_list[i])
-	var mmi := MultiMeshInstance3D.new()
+	var mmi = MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	mmi.material_override = mat("#e4d27a")
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	world.add_child(mmi)
 	# saídas (borda verde)
-	var ex := unshaded(OK_C, 0.5)
+	var ex = unshaded(OK_C, 0.5)
 	for y in RY:
 		box(Vector3(0.6, 0.06, RW * 2.0), ex, Vector3(0.3, 0.06, y), world, false)
 		box(Vector3(0.6, 0.06, RW * 2.0), ex, Vector3(ZW - 0.3, 0.06, y), world, false)
@@ -659,12 +659,12 @@ func build_world() -> void:
 		box(Vector3(RW * 2.0, 0.06, 0.6), ex, Vector3(x, 0.06, 0.3), world, false)
 		box(Vector3(RW * 2.0, 0.06, 0.6), ex, Vector3(x, 0.06, ZH - 0.3), world, false)
 	# candeeiros
-	var lamp_m := mat("#3c3f44", 0.5, 0.5)
-	var bulb := unshaded(Color("#fff1c2"))
+	var lamp_m = mat("#3c3f44", 0.5, 0.5)
+	var bulb = unshaded(Color("#fff1c2"))
 	for y in RY:
-		var x3 := 8.0
+		var x3 = 8.0
 		while x3 < ZW:
-			var near3 := false
+			var near3 = false
 			for rx in RX:
 				if absf(x3 - rx) < RW + 3.0:
 					near3 = true
@@ -687,20 +687,20 @@ func build_world() -> void:
 			box(Vector3(w * 0.9, 0.08, d + 0.02), mat("#5a4528"), Vector3(cx2, hgt * 0.55 + 0.25, cz2), world, false)
 			continue
 		box(Vector3(w, hgt, d), facade(b["col"]), Vector3(cx2, hgt / 2.0 + 0.25, cz2), world)
-		var roofc := Color(b["col"]).darkened(0.35)
+		var roofc = Color(b["col"]).darkened(0.35)
 		box(Vector3(w + 0.3, 0.35, d + 0.3), mat("#" + roofc.to_html(false)), Vector3(cx2, hgt + 0.42, cz2), world)
 		box(Vector3(w - 0.6, 0.12, d - 0.6), mat("#5d5f63"), Vector3(cx2, hgt + 0.62, cz2), world, false)
 		if w > 7.0:
 			box(Vector3(1.6, 0.9, 1.2), mat("#9aa0a6", 0.5, 0.4), Vector3(cx2 - w * 0.25, hgt + 1.1, cz2 + d * 0.2), world)
 		if b.get("main", false):
 			var front: float = b["y"] + d
-			var shop_c := Color(b["col"])
+			var shop_c = Color(b["col"])
 			box(Vector3(w * 0.84, 3.0, 0.15), mat("#1b2633", 0.12, 0.6), Vector3(cx2, 1.75, front + 0.02), world, false)
 			box(Vector3(2.2, 2.6, 0.2), mat("#1a1410"), Vector3(cx2, 1.55, front + 0.05), world, false)
 			box(Vector3(w * 0.9, 0.25, 1.8), mat("#" + shop_c.lightened(0.15).to_html(false)), Vector3(cx2, 3.55, front + 0.9), world)
-			var sign_bg := box(Vector3(minf(w * 0.7, 16.0), 1.6, 0.2), mat("#" + shop_c.darkened(0.45).to_html(false)), Vector3(cx2, 4.9, front + 0.1), world, false)
+			var sign_bg = box(Vector3(minf(w * 0.7, 16.0), 1.6, 0.2), mat("#" + shop_c.darkened(0.45).to_html(false)), Vector3(cx2, 4.9, front + 0.1), world, false)
 			sign_bg.name = "sign"
-			var lab := Label3D.new()
+			var lab = Label3D.new()
 			lab.text = b["label"]
 			lab.font_size = 96
 			lab.pixel_size = 0.012
@@ -711,14 +711,14 @@ func build_world() -> void:
 			lab.width = 1200
 			world.add_child(lab)
 	# árvores
-	var trunk := mat("#5a4030")
-	var leaf := mat("#3f7a45")
-	var leaf2 := mat("#4f8f50")
+	var trunk = mat("#5a4030")
+	var leaf = mat("#3f7a45")
+	var leaf2 = mat("#4f8f50")
 	for tr in Z["trees"]:
 		var rad: float = tr["r"]
 		cyl(0.14, 0.2, 1.6, trunk, Vector3(tr["x"], 1.05, tr["y"]), world, 6)
-		var f := MeshInstance3D.new()
-		var sm := SphereMesh.new()
+		var f = MeshInstance3D.new()
+		var sm = SphereMesh.new()
 		sm.radius = rad
 		sm.height = rad * 1.7
 		sm.radial_segments = 7
@@ -730,7 +730,7 @@ func build_world() -> void:
 	# porta (anel a pulsar) e bandeira
 	if not Z["door"].is_empty():
 		ring = MeshInstance3D.new()
-		var tm := TorusMesh.new()
+		var tm = TorusMesh.new()
 		tm.inner_radius = 1.2
 		tm.outer_radius = 1.55
 		tm.rings = 24
@@ -746,7 +746,7 @@ func build_world() -> void:
 		cyl(0.08, 0.1, 6.0, mat("#d8d8d8", 0.4, 0.6), Vector3(fx, 3.25, fz), world, 6)
 		cloth = box(Vector3(2.4, 1.5, 0.06), mat("#3cc48a") if S["terr"].has(Z["id"]) else mat(D.TERRS[Z["id"]]["col"]), Vector3(fx + 1.25, 5.4, fz), world)
 		ring = MeshInstance3D.new()
-		var tm2 := TorusMesh.new()
+		var tm2 = TorusMesh.new()
 		tm2.inner_radius = 3.8
 		tm2.outer_radius = 4.2
 		tm2.rings = 32
@@ -778,7 +778,7 @@ func enter_zone(id: String) -> void:
 	cap = 0.0
 	wanted = 0
 	lost_t = 0.0
-	var cd := car_def()
+	var cd = car_def()
 	if float(S["car_hp"]) <= 0:
 		S["car_hp"] = round(cd["hp"] * 0.35)
 		add_money(-mini(int(S["money"]), 200))
@@ -801,11 +801,11 @@ func enter_zone(id: String) -> void:
 		var tdef: Dictionary = D.TERRS[id]
 		var n: int = tdef["gang"]
 		for k in n:
-			var a := float(k) / n * TAU
-			var rr := randf_range(6.5, 16.0)
+			var a = float(k) / n * TAU
+			var rr = randf_range(6.5, 16.0)
 			var gx: float = Z["flag"]["x"] + cos(a) * rr
 			var gy: float = Z["flag"]["y"] + sin(a) * rr
-			var gm := make_person("#6a3a8a", "#2a2a33", true)
+			var gm = make_person("#6a3a8a", "#2a2a33", true)
 			add_child(gm)
 			gang.append({"x": gx, "y": gy, "hp": 40.0, "cd": randf_range(0.5, 1.5), "ang": 0.0, "mesh": gm, "phase": 0.0})
 	build_world()
@@ -834,24 +834,24 @@ func hud_hit(pos: Vector2) -> String:
 
 
 func _input(e: InputEvent) -> void:
-	var touch := DisplayServer.is_touchscreen_available()
+	var touch = DisplayServer.is_touchscreen_available()
 	if e is InputEventScreenTouch:
-		var st := e as InputEventScreenTouch
+		var st = e as InputEventScreenTouch
 		_pointer(st.index, st.position, st.pressed)
 	elif e is InputEventScreenDrag:
-		var sd := e as InputEventScreenDrag
+		var sd = e as InputEventScreenDrag
 		if not joy.is_empty() and joy["id"] == sd.index:
 			joy["pos"] = sd.position
 	elif e is InputEventMouseButton:
-		var mb := e as InputEventMouseButton
+		var mb = e as InputEventMouseButton
 		if not touch and mb.button_index == MOUSE_BUTTON_LEFT:
 			_pointer(-1, mb.position, mb.pressed)
 	elif e is InputEventMouseMotion:
-		var mm := e as InputEventMouseMotion
+		var mm = e as InputEventMouseMotion
 		if not touch and not joy.is_empty() and joy["id"] == -1:
 			joy["pos"] = mm.position
 	elif e is InputEventKey:
-		var k := e as InputEventKey
+		var k = e as InputEventKey
 		if k.pressed and not k.echo:
 			if mode == "play":
 				if k.keycode == KEY_E:
@@ -868,7 +868,7 @@ func _input(e: InputEvent) -> void:
 
 func _pointer(id: int, pos: Vector2, pressed: bool) -> void:
 	if pressed:
-		var h := hud_hit(pos)
+		var h = hud_hit(pos)
 		if h == "fire":
 			firing = true
 			fire_touch = id
@@ -887,7 +887,7 @@ func _pointer(id: int, pos: Vector2, pressed: bool) -> void:
 
 
 func input_vec() -> Vector2:
-	var v := Vector2.ZERO
+	var v = Vector2.ZERO
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
 		v.x -= 1
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
@@ -898,7 +898,7 @@ func input_vec() -> Vector2:
 		v.y += 1
 	if not joy.is_empty():
 		var d: Vector2 = joy["pos"] - joy["base"]
-		var R := 80.0
+		var R = 80.0
 		if d.length() > 8.0:
 			v = d / R if d.length() < R else d.normalized()
 	if v.length() > 1.0:
@@ -910,13 +910,13 @@ func input_vec() -> Vector2:
 #  CARROS
 # =====================================================================
 func drive(c: Dictionary, iv: Vector2, dt: float, maxspd: float) -> void:
-	var m := iv.length()
+	var m = iv.length()
 	if m > 0.15:
-		var ta := atan2(iv.y, iv.x)
-		var da := ang_diff(ta, c["ang"])
-		var turn := 3.4 * dt * minf(1.0, absf(c["spd"]) / 6.5 + 0.45)
+		var ta = atan2(iv.y, iv.x)
+		var da = ang_diff(ta, c["ang"])
+		var turn = 3.4 * dt * minf(1.0, absf(c["spd"]) / 6.5 + 0.45)
 		c["ang"] = c["ang"] + clampf(da, -turn, turn)
-		var tgt := maxspd * m * (0.45 if absf(da) > 1.6 else 1.0)
+		var tgt = maxspd * m * (0.45 if absf(da) > 1.6 else 1.0)
 		c["spd"] = c["spd"] + (tgt - c["spd"]) * minf(1.0, dt * 1.7)
 	else:
 		c["spd"] = c["spd"] * pow(0.12, dt)
@@ -951,7 +951,7 @@ func ctx_action() -> Dictionary:
 
 
 func do_action() -> void:
-	var a := ctx_action()
+	var a = ctx_action()
 	if a.has("f"):
 		a["f"].call()
 
@@ -981,15 +981,15 @@ func finish_heist() -> void:
 	var h: Dictionary = D.HEISTS[Z["id"]]
 	heist = {}
 	var got: Array = []
-	var lost := 0
+	var lost = 0
 	var capkg: float = bag_def()["cap"]
 	var items: Array = []
 	if h["cash"][1] > 0:
-		var v := randi_range(h["cash"][0], h["cash"][1])
+		var v = randi_range(h["cash"][0], h["cash"][1])
 		items.append({"n": "Dinheiro sujo", "kg": maxf(0.1, snappedf(v / 1000.0, 0.01)), "v": v, "dirty": true})
 	for L in h["loot"]:
 		if randf() < L["ch"]:
-			var q := randi_range(L["q"][0], L["q"][1])
+			var q = randi_range(L["q"][0], L["q"][1])
 			for k in q:
 				items.append({"n": L["n"], "kg": L["kg"], "v": L["v"]})
 	if items.is_empty():
@@ -1001,7 +1001,7 @@ func finish_heist() -> void:
 			got.append(it)
 		else:
 			lost += 1
-	var val := 0
+	var val = 0
 	for it in got:
 		val += int(it["v"])
 	toast("Saque: %d itens (%s)" % [got.size(), fmt(val)], GOLD)
@@ -1020,7 +1020,7 @@ func finish_heist() -> void:
 
 
 func busted() -> void:
-	var fine := int(S["money"] * 0.1)
+	var fine = int(S["money"] * 0.1)
 	S["money"] = int(S["money"]) - fine
 	S["inv"] = []
 	S["stats"]["busted"] = int(S["stats"]["busted"]) + 1
@@ -1029,7 +1029,7 @@ func busted() -> void:
 
 
 func hospital() -> void:
-	var fine := int(S["money"] * 0.15)
+	var fine = int(S["money"] * 0.15)
 	S["money"] = int(S["money"]) - fine
 	S["inv"] = []
 	S["hp"] = 100.0
@@ -1063,11 +1063,11 @@ func fire_bullet(x: float, y: float, a: float, from: String, dmg: float, life: f
 
 
 func shoot() -> void:
-	var w := weapon()
+	var w = weapon()
 	var tgt: Dictionary = {}
 	var best: float = w["range"]
 	for tt in police + gang:
-		var d := dist(P, tt)
+		var d = dist(P, tt)
 		if d < best:
 			best = d
 			tgt = tt
@@ -1094,8 +1094,8 @@ func add_part(x: float, y: float, h: float, vx: float, vy: float, life: float, c
 
 func boom(x: float, y: float, col := Color("#ff8a3a"), n := 18) -> void:
 	for i in n:
-		var a := randf() * TAU
-		var s := randf_range(3, 14)
+		var a = randf() * TAU
+		var s = randf_range(3, 14)
 		add_part(x, y, 0.8, cos(a) * s, sin(a) * s, randf_range(0.3, 0.7), col, randf_range(2, 8))
 
 
@@ -1130,7 +1130,7 @@ func spawn_police() -> void:
 	if ok.is_empty():
 		ok = pts
 	var s: Dictionary = ok[randi() % ok.size()]
-	var m := make_car("#e8ecf2", true)
+	var m = make_car("#e8ecf2", true)
 	add_child(m)
 	police.append({"x": s["x"], "y": s["y"], "ang": s["a"], "spd": 0.0, "hp": 60.0, "cd": randf_range(0.6, 1.4), "stuck": 0.0, "rev": 0.0, "rd": 1.0, "hit_cd": 0.0, "mesh": m})
 
@@ -1139,9 +1139,9 @@ func spawn_police() -> void:
 #  CICLO PRINCIPAL
 # =====================================================================
 func _process(delta: float) -> void:
-	var dt := minf(delta, 0.05)
+	var dt = minf(delta, 0.05)
 	t += dt
-	var rate := income_rate()
+	var rate = income_rate()
 	if rate > 0 and not S.is_empty():
 		S["pending"] = float(S["pending"]) + rate * dt / 60.0
 	if mode == "play":
@@ -1157,8 +1157,8 @@ func _process(delta: float) -> void:
 
 
 func update_game(dt: float) -> void:
-	var iv := input_vec()
-	var cd := car_def()
+	var iv = input_vec()
+	var cd = car_def()
 	P["px"] = P["x"]
 	P["py"] = P["y"]
 	if P["in_car"]:
@@ -1206,12 +1206,12 @@ func update_game(dt: float) -> void:
 		for p in police:
 			p["mesh"].queue_free()
 		police = []
-	var seen := false
-	var near := false
+	var seen = false
+	var near = false
 	for p in police:
 		var dx: float = P["x"] - p["x"]
 		var dy: float = P["y"] - p["y"]
-		var d := maxf(0.001, Vector2(dx, dy).length())
+		var d = maxf(0.001, Vector2(dx, dy).length())
 		if d < 33.0:
 			seen = true
 		if p["rev"] > 0:
@@ -1222,7 +1222,7 @@ func update_game(dt: float) -> void:
 			p["y"] = p["y"] + sin(p["ang"]) * p["spd"] * dt
 			push_out(p, 1.85)
 		else:
-			var slow := 0.3 if (not P["in_car"] and d < 9.0) else 1.0
+			var slow = 0.3 if (not P["in_car"] and d < 9.0) else 1.0
 			drive(p, Vector2(dx / d, dy / d), dt, (16.0 + wanted * 2.0) * slow)
 			if absf(p["spd"]) < 1.8 and d > 4.5:
 				p["stuck"] = p["stuck"] + dt
@@ -1239,7 +1239,7 @@ func update_game(dt: float) -> void:
 				p["cd"] = maxf(0.45, 1.2 - wanted * 0.12)
 		p["hit_cd"] = p["hit_cd"] - dt
 		if d < 3.7:
-			var ov := 3.7 - d
+			var ov = 3.7 - d
 			p["x"] = p["x"] - dx / d * ov * 0.6
 			p["y"] = p["y"] - dy / d * ov * 0.6
 			if P["in_car"]:
@@ -1290,9 +1290,9 @@ func update_game(dt: float) -> void:
 	for g in gang:
 		var dx2: float = P["x"] - g["x"]
 		var dy2: float = P["y"] - g["y"]
-		var d2 := maxf(0.001, Vector2(dx2, dy2).length())
+		var d2 = maxf(0.001, Vector2(dx2, dy2).length())
 		g["ang"] = atan2(dy2, dx2)
-		var moving := false
+		var moving = false
 		if d2 < 27.0:
 			if d2 > 12.0:
 				g["x"] = g["x"] + dx2 / d2 * 4.0 * dt
@@ -1341,7 +1341,7 @@ func update_game(dt: float) -> void:
 			continue
 		if b["from"] == "p":
 			for tt in police + gang:
-				var rr := 2.0 if tt.has("spd") else 0.7
+				var rr = 2.0 if tt.has("spd") else 0.7
 				if Vector2(tt["x"] - b["x"], tt["y"] - b["y"]).length() < rr:
 					tt["hp"] = tt["hp"] - b["dmg"]
 					b["life"] = 0.0
@@ -1362,12 +1362,12 @@ func update_game(dt: float) -> void:
 	if float(S["car_hp"]) <= 0 and randf() < 0.3:
 		add_part(car["x"] + randf_range(-0.6, 0.6), car["y"] + randf_range(-0.6, 0.6), 1.2, 0, 0, 0.9, Color("#3c3c3c"), 2.5)
 	# botão de ação
-	var a := ctx_action()
+	var a = ctx_action()
 	var lab: String = a.get("l", "—")
 	if lab != last_act:
 		last_act = lab
 		act_lbl.text = lab
-		var on := a.has("f")
+		var on = a.has("f")
 		act_panel.add_theme_stylebox_override("panel", circle_style(Color(0.11, 0.12, 0.15, 0.85), GOLD if on else LINE))
 		act_lbl.add_theme_color_override("font_color", GOLD if on else DIM)
 
@@ -1393,7 +1393,7 @@ func update_parts(dt: float) -> void:
 func render(dt: float) -> void:
 	update_parts(dt)
 	# carro do jogador
-	var cd := car_def()
+	var cd = car_def()
 	if car.has("mesh"):
 		var cm: Node3D = car["mesh"]
 		if cm.get_meta("col") != cd["col"]:
@@ -1408,23 +1408,23 @@ func render(dt: float) -> void:
 	# jogador a pé
 	player_mesh.visible = not P["in_car"]
 	if not P["in_car"]:
-		var mv := Vector2(P["x"] - P["px"], P["y"] - P["py"]).length() / maxf(dt, 0.001)
+		var mv = Vector2(P["x"] - P["px"], P["y"] - P["py"]).length() / maxf(dt, 0.001)
 		P["phase"] = P["phase"] + mv * dt * 1.7
 		player_mesh.position = Vector3(P["x"], 0.25, P["y"])
 		player_mesh.rotation.y = -P["ang"]
 		animate_person(player_mesh, P["phase"], mv > 0.5)
 		player_mesh.scale = Vector3.ONE * (1.08 if P["hurt"] > 0 else 1.0)
 	# polícia
-	var flash := int(t * 8.0) % 2 == 0
+	var flash = int(t * 8.0) % 2 == 0
 	var near_p: Dictionary = {}
-	var nd := 9999.0
+	var nd = 9999.0
 	for p in police:
 		var m: Node3D = p["mesh"]
 		m.position = Vector3(p["x"], 0, p["y"])
 		m.rotation.y = -p["ang"]
 		m.get_meta("lr").visible = flash
 		m.get_meta("lb").visible = not flash
-		var d := dist(P, p)
+		var d = dist(P, p)
 		if d < nd:
 			nd = d
 			near_p = p
@@ -1464,14 +1464,14 @@ func render(dt: float) -> void:
 			pm.visible = false
 	# marcadores
 	if ring:
-		var s := 1.0 + sin(t * 4.0) * 0.08
+		var s = 1.0 + sin(t * 4.0) * 0.08
 		ring.scale = Vector3(s, 1, s)
 	if cloth:
 		cloth.rotation.y = sin(t * 3.0) * 0.12
 	# câmara
-	var portrait := get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x
-	var k2 := 1.45 if portrait else 1.0
-	var tgt := Vector3(P["x"], 0, P["y"])
+	var portrait = get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x
+	var k2 = 1.45 if portrait else 1.0
+	var tgt = Vector3(P["x"], 0, P["y"])
 	if P["in_car"]:
 		tgt += Vector3(cos(car["ang"]), 0, sin(car["ang"])) * car["spd"] * 0.25
 	if snap_cam:
@@ -1487,7 +1487,7 @@ func render(dt: float) -> void:
 #  INTERFACE
 # =====================================================================
 func lbl(text: String, size := 20, col := Color("#ecebe6")) -> Label:
-	var l := Label.new()
+	var l = Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
@@ -1496,7 +1496,7 @@ func lbl(text: String, size := 20, col := Color("#ecebe6")) -> Label:
 
 
 func flat(bg: Color, radius := 12, border := LINE, bw := 1) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
+	var s = StyleBoxFlat.new()
 	s.bg_color = bg
 	s.set_corner_radius_all(radius)
 	s.border_color = border
@@ -1509,20 +1509,20 @@ func flat(bg: Color, radius := 12, border := LINE, bw := 1) -> StyleBoxFlat:
 
 
 func circle_style(bg: Color, border: Color) -> StyleBoxFlat:
-	var s := flat(bg, 200, border, 3)
+	var s = flat(bg, 200, border, 3)
 	return s
 
 
 func pbar(col: Color, w := 150.0, h := 7.0) -> ProgressBar:
-	var b := ProgressBar.new()
+	var b = ProgressBar.new()
 	b.custom_minimum_size = Vector2(w, h)
 	b.show_percentage = false
 	b.max_value = 100
 	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var f := StyleBoxFlat.new()
+	var f = StyleBoxFlat.new()
 	f.bg_color = col
 	f.set_corner_radius_all(4)
-	var bg := StyleBoxFlat.new()
+	var bg = StyleBoxFlat.new()
 	bg.bg_color = Color("#2b2f37")
 	bg.set_corner_radius_all(4)
 	b.add_theme_stylebox_override("fill", f)
@@ -1550,12 +1550,12 @@ func full(c: Control) -> void:
 
 
 func ui_button(text: String, cb: Callable, kind := "", disabled := false) -> Button:
-	var b := Button.new()
+	var b = Button.new()
 	b.text = text
 	b.disabled = disabled
 	b.custom_minimum_size = Vector2(130, 46)
-	var bg := Color("#2f3440")
-	var fg := Color("#ecebe6")
+	var bg = Color("#2f3440")
+	var fg = Color("#ecebe6")
 	if kind == "g":
 		bg = GOLD
 		fg = Color("#1a1a1a")
@@ -1564,7 +1564,7 @@ func ui_button(text: String, cb: Callable, kind := "", disabled := false) -> But
 		fg = Color("#0e2219")
 	elif kind == "r":
 		bg = RED
-	var s := flat(bg, 10, bg, 0)
+	var s = flat(bg, 10, bg, 0)
 	b.add_theme_stylebox_override("normal", s)
 	b.add_theme_stylebox_override("hover", s)
 	b.add_theme_stylebox_override("pressed", flat(bg.darkened(0.2), 10, bg, 0))
@@ -1582,7 +1582,7 @@ func ui_button(text: String, cb: Callable, kind := "", disabled := false) -> But
 func setup_ui() -> void:
 	ui = CanvasLayer.new()
 	add_child(ui)
-	var th := Theme.new()
+	var th = Theme.new()
 	th.default_font_size = 20
 	# --- HUD
 	hud = Control.new()
@@ -1590,18 +1590,18 @@ func setup_ui() -> void:
 	hud.theme = th
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(hud)
-	var mp := PanelContainer.new()
+	var mp = PanelContainer.new()
 	mp.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.8)))
 	mp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	place(mp, 0, 0, 16, 14, 150, 52)
 	lbl_money = lbl("$0", 26, GOLD)
 	mp.add_child(lbl_money)
 	hud.add_child(mp)
-	var lp := PanelContainer.new()
+	var lp = PanelContainer.new()
 	lp.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.8)))
 	lp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	place(lp, 0, 0, 178, 14, 220, 52)
-	var lv := VBoxContainer.new()
+	var lv = VBoxContainer.new()
 	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl_lvl = lbl("Nível 1", 16, DIM)
 	lv.add_child(lbl_lvl)
@@ -1609,11 +1609,11 @@ func setup_ui() -> void:
 	lv.add_child(bar_xp)
 	lp.add_child(lv)
 	hud.add_child(lp)
-	var rp := PanelContainer.new()
+	var rp = PanelContainer.new()
 	rp.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.8)))
 	rp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	place(rp, 1, 0, -310, 14, 220, 66)
-	var rv := VBoxContainer.new()
+	var rv = VBoxContainer.new()
 	rv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rv.add_theme_constant_override("separation", 4)
 	lbl_bag = lbl("Saco 0/10kg", 15, DIM)
@@ -1628,7 +1628,7 @@ func setup_ui() -> void:
 	menu_panel.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.85)))
 	menu_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	place(menu_panel, 1, 0, -78, 14, 62, 62)
-	var ml := lbl("≡", 34)
+	var ml = lbl("≡", 34)
 	ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ml.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	full(ml)
@@ -1642,7 +1642,7 @@ func setup_ui() -> void:
 	prog_box.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.85)))
 	prog_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	place(prog_box, 0.5, 0.25, -200, 0, 400, 70)
-	var pv := VBoxContainer.new()
+	var pv = VBoxContainer.new()
 	pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	prog_lbl = lbl("", 19)
 	prog_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1656,7 +1656,7 @@ func setup_ui() -> void:
 	fire_panel.add_theme_stylebox_override("panel", circle_style(Color(0.33, 0.1, 0.08, 0.85), Color("#8b2f28")))
 	fire_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	place(fire_panel, 1, 1, -170, -170, 140, 140)
-	var fl := lbl("DISPARAR", 20)
+	var fl = lbl("DISPARAR", 20)
 	fl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	full(fl)
@@ -1689,11 +1689,11 @@ func setup_ui() -> void:
 	map_ui = Control.new()
 	full(map_ui)
 	map_ui.theme = th
-	var mbg := ColorRect.new()
+	var mbg = ColorRect.new()
 	mbg.color = Color(0.04, 0.045, 0.055, 0.92)
 	full(mbg)
 	map_ui.add_child(mbg)
-	var mt := lbl("Vila Rubra — para onde vais?", 26)
+	var mt = lbl("Vila Rubra — para onde vais?", 26)
 	place(mt, 0, 0, 30, 18, 600, 40)
 	map_ui.add_child(mt)
 	map_info = lbl("", 17, GOLD)
@@ -1714,11 +1714,11 @@ func setup_ui() -> void:
 	modal = Control.new()
 	full(modal)
 	modal.theme = th
-	var dim := ColorRect.new()
+	var dim = ColorRect.new()
 	dim.color = Color(0.04, 0.045, 0.055, 0.8)
 	full(dim)
 	modal.add_child(dim)
-	var pc := PanelContainer.new()
+	var pc = PanelContainer.new()
 	pc.add_theme_stylebox_override("panel", flat(PANEL, 16, LINE, 1))
 	pc.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pc.anchor_left = 0.5
@@ -1728,16 +1728,16 @@ func setup_ui() -> void:
 	pc.offset_top = 24
 	pc.offset_bottom = -24
 	modal.add_child(pc)
-	var mv := VBoxContainer.new()
+	var mv = VBoxContainer.new()
 	mv.add_theme_constant_override("separation", 10)
 	pc.add_child(mv)
-	var mh := HBoxContainer.new()
+	var mh = HBoxContainer.new()
 	modal_title = lbl("", 26)
 	modal_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mh.add_child(modal_title)
 	mh.add_child(ui_button("Fechar", close_menu))
 	mv.add_child(mh)
-	var sc := ScrollContainer.new()
+	var sc = ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	mv.add_child(sc)
@@ -1751,23 +1751,23 @@ func setup_ui() -> void:
 	login_ui = Control.new()
 	full(login_ui)
 	login_ui.theme = th
-	var lbg := ColorRect.new()
+	var lbg = ColorRect.new()
 	lbg.color = Color("#14161b")
 	full(lbg)
 	login_ui.add_child(lbg)
-	var cc := CenterContainer.new()
+	var cc = CenterContainer.new()
 	full(cc)
 	login_ui.add_child(cc)
-	var lvb := VBoxContainer.new()
+	var lvb = VBoxContainer.new()
 	lvb.add_theme_constant_override("separation", 14)
 	cc.add_child(lvb)
-	var title := lbl("GOLPE", 110, GOLD)
+	var title = lbl("GOLPE", 110, GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_shadow_color", Color("#6b1f1a"))
 	title.add_theme_constant_override("shadow_offset_x", 6)
 	title.add_theme_constant_override("shadow_offset_y", 6)
 	lvb.add_child(title)
-	var tag := lbl("Vila Rubra · crime em mundo aberto", 18, DIM)
+	var tag = lbl("Vila Rubra · crime em mundo aberto", 18, DIM)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lvb.add_child(tag)
 	nick_edit = LineEdit.new()
@@ -1779,11 +1779,11 @@ func setup_ui() -> void:
 	nick_edit.add_theme_stylebox_override("focus", flat(PANEL, 10, GOLD))
 	nick_edit.add_theme_font_size_override("font_size", 22)
 	lvb.add_child(nick_edit)
-	var play := ui_button("JOGAR", _on_play, "g")
+	var play = ui_button("JOGAR", _on_play, "g")
 	play.custom_minimum_size = Vector2(360, 60)
 	play.add_theme_font_size_override("font_size", 24)
 	lvb.add_child(play)
-	var ver := lbl("conteúdo %s · app %s" % [content_version, str(Engine.get_meta("app_version", "dev"))], 14, Color("#5d616b"))
+	var ver = lbl("conteúdo %s · app %s" % [content_version, str(Engine.get_meta("app_version", "dev"))], 14, Color("#5d616b"))
 	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lvb.add_child(ver)
 	ui.add_child(login_ui)
@@ -1791,7 +1791,7 @@ func setup_ui() -> void:
 	travel_ui = ColorRect.new()
 	travel_ui.color = Color("#0d0e11")
 	full(travel_ui)
-	var tl := lbl("A caminho…", 26, GOLD)
+	var tl = lbl("A caminho…", 26, GOLD)
 	tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	full(tl)
@@ -1808,7 +1808,7 @@ func show_login() -> void:
 
 
 func _on_play() -> void:
-	var n := nick_edit.text.strip_edges()
+	var n = nick_edit.text.strip_edges()
 	if n == "":
 		toast("Escolhe um nome", RED)
 		return
@@ -1834,20 +1834,20 @@ func travel(cb: Callable) -> void:
 func toast(text: String, col := LINE) -> void:
 	if toasts == null:
 		return
-	var p := PanelContainer.new()
+	var p = PanelContainer.new()
 	p.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.93), 10, col, 2))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var l := lbl(text, 19)
+	var l = lbl(text, 19)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(0, 0)
 	p.add_child(l)
 	toasts.add_child(p)
 	while toasts.get_child_count() > 4:
-		var c := toasts.get_child(0)
+		var c = toasts.get_child(0)
 		toasts.remove_child(c)
 		c.queue_free()
-	var tw := p.create_tween()
+	var tw = p.create_tween()
 	tw.tween_interval(2.6)
 	tw.tween_property(p, "modulate:a", 0.0, 0.4)
 	tw.tween_callback(p.queue_free)
@@ -1860,7 +1860,7 @@ func update_hud() -> void:
 	bar_hp.value = float(S["hp"])
 	bar_car.value = 100.0 * float(S["car_hp"]) / float(car_def()["hp"])
 	lbl_bag.text = "Saco %.1f/%dkg" % [inv_kg(), bag_def()["cap"]]
-	var st := (prog_bar.get_theme_stylebox("fill") as StyleBoxFlat)
+	var st = (prog_bar.get_theme_stylebox("fill") as StyleBoxFlat)
 	if not heist.is_empty():
 		prog_box.visible = true
 		prog_lbl.text = "A assaltar %s…" % D.HEISTS[Z["id"]]["name"]
@@ -1881,10 +1881,10 @@ func update_hud() -> void:
 
 
 func star_pts(c: Vector2, r: float) -> PackedVector2Array:
-	var pts := PackedVector2Array()
+	var pts = PackedVector2Array()
 	for i in 10:
-		var a := -PI / 2 + i * PI / 5
-		var rr := r if i % 2 == 0 else r * 0.45
+		var a = -PI / 2 + i * PI / 5
+		var rr = r if i % 2 == 0 else r * 0.45
 		pts.append(c + Vector2(cos(a), sin(a)) * rr)
 	return pts
 
@@ -1892,34 +1892,34 @@ func star_pts(c: Vector2, r: float) -> PackedVector2Array:
 func _draw_overlay() -> void:
 	if mode == "login" or Z.is_empty() or not hud.visible:
 		return
-	var vs := overlay.size
+	var vs = overlay.size
 	if wanted > 0 and mode == "play":
-		var c := Color(0.88, 0.24, 0.24) if int(t * 3) % 2 == 0 else Color(0.24, 0.43, 0.88)
+		var c = Color(0.88, 0.24, 0.24) if int(t * 3) % 2 == 0 else Color(0.24, 0.43, 0.88)
 		for i in 6:
-			var a := 0.22 * (1.0 - i / 6.0)
+			var a = 0.22 * (1.0 - i / 6.0)
 			overlay.draw_rect(Rect2(Vector2(i * 9, i * 9), vs - Vector2(i * 18, i * 18)), Color(c.r, c.g, c.b, a), false, 9.0)
-	var sx := vs.x / 2.0 - 2.0 * 40.0
+	var sx = vs.x / 2.0 - 2.0 * 40.0
 	for i in 5:
-		var on := i < wanted
-		var col := (RED if int(t * 3) % 2 == 0 else GOLD) if on else Color(0.27, 0.29, 0.33)
-		var pts := star_pts(Vector2(sx + i * 40.0, 40.0), 16.0)
+		var on = i < wanted
+		var col = (RED if int(t * 3) % 2 == 0 else GOLD) if on else Color(0.27, 0.29, 0.33)
+		var pts = star_pts(Vector2(sx + i * 40.0, 40.0), 16.0)
 		overlay.draw_colored_polygon(star_pts(Vector2(sx + i * 40.0 + 2, 42.0), 16.0), Color(0, 0, 0, 0.5))
 		overlay.draw_colored_polygon(pts, col)
 	if mode != "play":
 		return
 	var goal: Dictionary = Z["door"] if not Z["door"].is_empty() else Z["flag"]
 	if not goal.is_empty():
-		var gp := Vector3(goal["x"], 1.0, goal["y"])
-		var sp := cam.unproject_position(gp)
-		var behind := cam.is_position_behind(gp)
+		var gp = Vector3(goal["x"], 1.0, goal["y"])
+		var sp = cam.unproject_position(gp)
+		var behind = cam.is_position_behind(gp)
 		if behind or sp.x < 0 or sp.y < 0 or sp.x > vs.x or sp.y > vs.y:
-			var dir := (sp - vs / 2.0).normalized()
+			var dir = (sp - vs / 2.0).normalized()
 			if behind:
 				dir = -dir
-			var R := minf(vs.x, vs.y) * 0.38
-			var ap := vs / 2.0 + dir * R
-			var ang := dir.angle()
-			var tri := PackedVector2Array([ap + Vector2(18, 0).rotated(ang), ap + Vector2(-10, -12).rotated(ang), ap + Vector2(-10, 12).rotated(ang)])
+			var R = minf(vs.x, vs.y) * 0.38
+			var ap = vs / 2.0 + dir * R
+			var ang = dir.angle()
+			var tri = PackedVector2Array([ap + Vector2(18, 0).rotated(ang), ap + Vector2(-10, -12).rotated(ang), ap + Vector2(-10, 12).rotated(ang)])
 			overlay.draw_colored_polygon(tri, RED if Z["kind"] == "heist" else GOLD)
 	if not joy.is_empty():
 		var base: Vector2 = joy["base"]
@@ -1941,12 +1941,12 @@ func open_map() -> void:
 		c.queue_free()
 	for n in D.MAPNODES:
 		var id: String = n["id"]
-		var k := kind_of(id)
-		var d := def_of(id)
+		var k = kind_of(id)
+		var d = def_of(id)
 		var lvl: int = d.get("lvl", 1)
-		var lock := int(S["lvl"]) < lvl
-		var st := ""
-		var border := GOLD
+		var lock = int(S["lvl"]) < lvl
+		var st = ""
+		var border = GOLD
 		if k == "heist":
 			border = RED
 		elif k == "terr":
@@ -1961,8 +1961,8 @@ func open_map() -> void:
 		elif k == "terr":
 			st = ("Teu · %s/min" % fmt(d["income"])) if S["terr"].has(id) else ("Gangue: %d" % d["gang"])
 		var mis: Dictionary = S["mission"]
-		var hi := (not mis.is_empty() and not mis["done"] and mis["target"] == id) or (not mis.is_empty() and mis["done"] and id == "bar")
-		var b := Button.new()
+		var hi = (not mis.is_empty() and not mis["done"] and mis["target"] == id) or (not mis.is_empty() and mis["done"] and id == "bar")
+		var b = Button.new()
 		b.text = d["name"] + ("\n" + st if st != "" else "")
 		b.anchor_left = n["x"] / 100.0
 		b.anchor_right = n["x"] / 100.0
@@ -1972,10 +1972,10 @@ func open_map() -> void:
 		b.offset_right = 105
 		b.offset_top = -34
 		b.offset_bottom = 34
-		var bg := Color(0.11, 0.12, 0.15, 0.95)
+		var bg = Color(0.11, 0.12, 0.15, 0.95)
 		if S["terr"].has(id):
 			bg = Color("#3a2a52")
-		var s := flat(bg, 14, GOLD if hi else border, 4 if hi else 2)
+		var s = flat(bg, 14, GOLD if hi else border, 4 if hi else 2)
 		b.add_theme_stylebox_override("normal", s)
 		b.add_theme_stylebox_override("hover", s)
 		b.add_theme_stylebox_override("pressed", flat(bg.lightened(0.1), 14, border, 2))
@@ -1984,35 +1984,35 @@ func open_map() -> void:
 		b.add_theme_color_override("font_color", DIM if lock else Color("#ecebe6"))
 		b.pressed.connect(func(): _map_pick(id))
 		map_area.add_child(b)
-	var r := income_rate()
+	var r = income_rate()
 	map_info.text = ("Rendas: +%s/min" % fmt(r)) if r > 0 else ""
 	map_ui.visible = true
 	map_area.queue_redraw()
 
 
 func _draw_map() -> void:
-	var s := map_area.size
+	var s = map_area.size
 	map_area.draw_rect(Rect2(Vector2.ZERO, s), Color("#2c3a2e"))
 	map_area.draw_circle(Vector2(s.x * 0.06, s.y * 1.0), s.y * 0.38, Color("#1f4c6b"))
 	map_area.draw_circle(Vector2(s.x * 1.0, 0), s.y * 0.3, Color("#1f4c6b"))
 	for i in 9:
 		map_area.draw_line(Vector2(s.x * i / 8.0, 0), Vector2(s.x * i / 8.0, s.y), Color(1, 1, 1, 0.03), 2.0)
 	var home: Dictionary = D.MAPNODES[0]
-	var hp := Vector2(s.x * home["x"] / 100.0, s.y * home["y"] / 100.0)
+	var hp = Vector2(s.x * home["x"] / 100.0, s.y * home["y"] / 100.0)
 	for n in D.MAPNODES:
 		if n["id"] == "home":
 			continue
-		var np := Vector2(s.x * n["x"] / 100.0, s.y * n["y"] / 100.0)
-		var mid := Vector2((hp.x + np.x) / 2.0, hp.y)
-		var pts := PackedVector2Array()
+		var np = Vector2(s.x * n["x"] / 100.0, s.y * n["y"] / 100.0)
+		var mid = Vector2((hp.x + np.x) / 2.0, hp.y)
+		var pts = PackedVector2Array()
 		for i in 17:
-			var q := i / 16.0
+			var q = i / 16.0
 			pts.append(hp.lerp(mid, q).lerp(mid.lerp(np, q), q))
 		map_area.draw_polyline(pts, Color("#555a52"), 7.0, true)
 
 
 func _map_pick(id: String) -> void:
-	var d := def_of(id)
+	var d = def_of(id)
 	if int(S["lvl"]) < int(d.get("lvl", 1)):
 		toast("Precisas de nível %d" % d["lvl"], RED)
 		return
@@ -2056,14 +2056,14 @@ func act(cb: Callable) -> Callable:
 
 
 func h3(box: VBoxContainer, text: String) -> void:
-	var l := lbl(text.to_upper(), 15, DIM)
+	var l = lbl(text.to_upper(), 15, DIM)
 	l.custom_minimum_size = Vector2(0, 34)
 	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	box.add_child(l)
 
 
 func note(box: VBoxContainer, text: String, italic := false) -> void:
-	var l := lbl(text, 17, DIM)
+	var l = lbl(text, 17, DIM)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if italic:
 		l.add_theme_color_override("font_color", Color("#b9b6ad"))
@@ -2071,30 +2071,30 @@ func note(box: VBoxContainer, text: String, italic := false) -> void:
 
 
 func row(box: VBoxContainer, title: String, sub: String, btext: String, cb: Callable, kind := "", disabled := false) -> void:
-	var h := HBoxContainer.new()
+	var h = HBoxContainer.new()
 	h.add_theme_constant_override("separation", 12)
-	var v := VBoxContainer.new()
+	var v = VBoxContainer.new()
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(lbl(title, 20))
 	if sub != "":
-		var s := lbl(sub, 15, DIM)
+		var s = lbl(sub, 15, DIM)
 		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(s)
 	h.add_child(v)
 	h.add_child(ui_button(btext, act(cb), kind, disabled))
 	box.add_child(h)
-	var sep := HSeparator.new()
+	var sep = HSeparator.new()
 	box.add_child(sep)
 
 
 func big_button(box: VBoxContainer, text: String, cb: Callable, kind := "", disabled := false) -> void:
-	var b := ui_button(text, act(cb), kind, disabled)
+	var b = ui_button(text, act(cb), kind, disabled)
 	b.custom_minimum_size = Vector2(0, 54)
 	box.add_child(b)
 
 
 func group_inv() -> Array:
-	var m := {}
+	var m = {}
 	var order: Array = []
 	for i in S["inv"]:
 		var k: String = i["n"]
@@ -2138,13 +2138,13 @@ func open_shop(id: String) -> void:
 func menu_bar(box: VBoxContainer) -> void:
 	note(box, "Zé Faísca, a limpar um copo: \"Traz-me coisas boas e eu arranjo comprador. Sem perguntas.\"", true)
 	h3(box, "Vender saque")
-	var gs := group_inv()
+	var gs = group_inv()
 	if gs.is_empty():
 		note(box, "O teu saco está vazio.")
 	else:
-		var tot := 0
+		var tot = 0
 		for g in gs:
-			var v := sell_val(g)
+			var v = sell_val(g)
 			tot += v
 			var nm: String = g["n"]
 			row(box, "%s ×%d" % [nm, g["c"]], "%.1fkg%s" % [g["kg"], " · lavagem 80%" if g["dirty"] else ""], fmt(v), func():
@@ -2202,7 +2202,7 @@ func menu_arm(box: VBoxContainer) -> void:
 	h3(box, "Armas")
 	for w in D.WEAPONS:
 		var wid: String = w["id"]
-		var sub := "Dano %d%s · %.1f tiros/s · alcance %dm" % [w["dmg"], ("×%d" % w["pel"]) if w["pel"] > 1 else "", 1.0 / w["rate"], int(w["range"])]
+		var sub = "Dano %d%s · %.1f tiros/s · alcance %dm" % [w["dmg"], ("×%d" % w["pel"]) if w["pel"] > 1 else "", 1.0 / w["rate"], int(w["range"])]
 		buy_row(box, w, S["weapons"].has(wid), S["weapon"] == wid, sub, func():
 			S["weapons"].append(wid)
 			S["weapon"] = wid, func(): S["weapon"] = wid)
@@ -2233,7 +2233,7 @@ func menu_stand(box: VBoxContainer) -> void:
 			S["car_hp"] = chp)
 	h3(box, "Oficina")
 	var miss: float = float(car_def()["hp"]) - float(S["car_hp"])
-	var cost := int(ceil(miss * 4.0))
+	var cost = int(ceil(miss * 4.0))
 	row(box, "Reparar " + car_def()["name"], "%d/%d" % [int(S["car_hp"]), car_def()["hp"]], fmt(cost), func():
 		S["money"] = int(S["money"]) - cost
 		S["car_hp"] = float(car_def()["hp"])
@@ -2241,7 +2241,7 @@ func menu_stand(box: VBoxContainer) -> void:
 
 
 func collect_button(box: VBoxContainer) -> void:
-	var p := int(floor(float(S["pending"])))
+	var p = int(floor(float(S["pending"])))
 	big_button(box, "Recolher rendas · " + fmt(p), func():
 		add_money(p)
 		S["pending"] = float(S["pending"]) - p
@@ -2255,7 +2255,7 @@ func menu_imob(box: VBoxContainer) -> void:
 		var pid: String = p["id"]
 		var price: int = p["price"]
 		var owned: bool = S["props"].has(pid)
-		var sub := "Renda %s/min" % fmt(p["rent"])
+		var sub = "Renda %s/min" % fmt(p["rent"])
 		if not owned:
 			if int(S["lvl"]) < int(p["lvl"]):
 				row(box, p["name"], sub, "Nível %d" % p["lvl"], func(): pass, "", true)
@@ -2289,7 +2289,7 @@ func menu_home(box: VBoxContainer) -> void:
 func menu_pause() -> void:
 	open_menu("Menu", func(box: VBoxContainer):
 		h3(box, "Saco")
-		var gs := group_inv()
+		var gs = group_inv()
 		if gs.is_empty():
 			note(box, "Vazio.")
 		for g in gs:
