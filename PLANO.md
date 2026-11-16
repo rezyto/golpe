@@ -82,3 +82,9 @@ móveis = caixas, janela de saque vazia e com texto, bússola/nome da zona por c
 6. Bar O Farol = HISTÓRIA (já não compra saque): Cap.1 "A fotografia" (encontrar foto no cofre do hotel) → desbloqueia joalharia + gazuas;
    Cap.2 "A dívida" (pagar $1 000 000) → desbloqueia banco + saco XL; Cap.3 "O livro de contas" (roubar do banco) → contratos de elite. Contratos continuam.
 7. Economia ×10 (para $1 000 000 fazer sentido). Saves antigos são reiniciados (protótipo).
+
+## Estado v0.4 (feito 16/11)
+Pontos 1–7 do plano v0.4 implementados e verificados por capturas (ramo `capturas`) + autoteste no CI. App 2.2.0 (mobília nova vai no APK).
+Código: game/main.gd (secções: ITENS E DINHEIRO, JANELA DE ITENS, INTERIORES, CARRINHAS, MENUS), game/data.gd (ITEMS, INTERIORS, STORY, VAN_*), game/icons/*.png.
+Save com "ver": 4 (saves antigos reiniciam). Por fazer: personagens mais realistas (Quaternius Universal Base Characters + Animation Library, CC0),
+física de carros (VehicleBody3D), texturas PBR/HDRI, renderizador móvel, som, multijogador.

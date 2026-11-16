@@ -70,8 +70,8 @@ const ITEMS := {
 	"estatueta": {"n": "Estatueta de bronze", "cat": "arte", "kg": 7.0, "v": 35000},
 	"vaso": {"n": "Vaso cerâmico", "cat": "arte", "kg": 5.0, "v": 25000},
 	"moeda": {"n": "Moeda rara", "cat": "arte", "kg": 0.1, "v": 15000},
-	"foto": {"n": "Fotografia antiga", "cat": "historia", "kg": 0.05, "v": 0},
-	"livro": {"n": "Livro de contas", "cat": "historia", "kg": 0.8, "v": 0},
+	"foto": {"n": "Fotografia antiga", "cat": "historia", "kg": 0.0, "v": 0},
+	"livro": {"n": "Livro de contas", "cat": "historia", "kg": 0.0, "v": 0},
 }
 
 const CAT_NAMES := {"joias": "Joias", "eletronica": "Eletrónica", "bebidas": "Bebidas", "arte": "Arte", "farmacia": "Farmácia", "diversos": "Diversos"}

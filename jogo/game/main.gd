@@ -2441,12 +2441,12 @@ func spawn_vans() -> void:
 		world.add_child(npc)
 		var lab = Label3D.new()
 		lab.text = "%s\n+30%% %s" % [ty["name"], D.CAT_NAMES[ty["cat"]]]
-		lab.font_size = 48
-		lab.pixel_size = 0.01
+		lab.font_size = 40
+		lab.pixel_size = 0.008
 		lab.outline_size = 10
 		lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		lab.modulate = Color("#b8f0c8")
-		lab.position = Vector3(vx - 0.8, 3.3, vy)
+		lab.position = Vector3(vx - 0.8, 3.0, vy)
 		world.add_child(lab)
 		vans.append(v)
 
@@ -3299,8 +3299,8 @@ func flat(bg: Color, radius = 12, border = LINE, bw = 1) -> StyleBoxFlat:
 	return s
 
 
-func circle_style(bg: Color, border: Color) -> StyleBoxFlat:
-	var s = flat(bg, 56, border, 3)
+func circle_style(bg: Color, border: Color, rad = 58) -> StyleBoxFlat:
+	var s = flat(bg, rad, border, 3)
 	s.corner_detail = 12
 	return s
 
@@ -3488,6 +3488,7 @@ func setup_ui() -> void:
 	place(hotbar, 0.5, 1, -260, -88, 520, 72)
 	hud.add_child(hotbar)
 	fire_panel = round_btn("DISPARAR", 19, Color("#ecebe6"), Color(0.33, 0.1, 0.08, 0.85), Color("#8b2f28"))
+	fire_panel.add_theme_stylebox_override("panel", circle_style(Color(0.33, 0.1, 0.08, 0.85), Color("#8b2f28"), 69))
 	place(fire_panel, 1, 1, -166, -166, 140, 140)
 	hud.add_child(fire_panel)
 	act_panel = round_btn("—", 16, DIM, Color(0.11, 0.12, 0.15, 0.85), LINE)
@@ -3736,7 +3737,9 @@ func toast(text: String, col = LINE) -> void:
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var l = lbl(text, 18)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if text.length() > 52:
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(560, 0)
 	p.add_child(l)
 	toasts.add_child(p)
 	while toasts.get_child_count() > 3:
