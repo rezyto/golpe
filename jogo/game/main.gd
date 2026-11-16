@@ -109,6 +109,7 @@ var save_t = 0.0
 var reset_arm = 0.0
 var vans = []
 var cam_dbg = Vector3.ZERO
+var anims_logged = false
 var ui_font: Font
 var icon_cache = {}
 var loot_mode = "loot"
@@ -945,8 +946,11 @@ func make_char(model: String, armed: bool, fallback_shirt: String) -> Node3D:
 	var aps = inst.find_children("*", "AnimationPlayer", true, false)
 	if aps.size() > 0:
 		var ap: AnimationPlayer = aps[0]
+		if not anims_logged:
+			anims_logged = true
+			print("anims: ", ap.get_animation_list())
 		for an in ap.get_animation_list():
-			if an.contains("Loop") or an in ["Pistol_Shoot", "Interact", "Fixing_Kneeling", "Pistol_Aim_Neutral"]:
+			if an.contains("Loop") or an in ["Idle", "Walk", "Jog_Fwd", "Sprint", "Crouch_Idle", "Pistol_Idle", "Sitting_Idle", "Pistol_Shoot", "Interact", "Fixing_Kneeling"]:
 				ap.get_animation(an).loop_mode = Animation.LOOP_LINEAR
 		pivot.set_meta("ap", ap)
 		pivot.set_meta("cur", "")
@@ -1009,9 +1013,12 @@ func play_anim(m: Node3D, an: String) -> void:
 	if m.get_meta("cur") == an:
 		return
 	var ap: AnimationPlayer = m.get_meta("ap")
-	if ap.has_animation(an):
-		ap.play(an, 0.2)
-		m.set_meta("cur", an)
+	m.set_meta("cur", an)
+	var real = an
+	if not ap.has_animation(real):
+		real = an.replace("_Loop", "")
+	if ap.has_animation(real):
+		ap.play(real, 0.2)
 
 
 func animate_char(m: Node3D, phase: float, speed: float, shooting = false, hands_up = false) -> void:
