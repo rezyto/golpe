@@ -6,6 +6,10 @@ REGRA: nada copiado (mapa, itens, personagens, arte, sons, UI). Só mecânicas g
 ## Estado
 - v0.1 (web 2D) DESCARTADA: utilizador quer app nativa 3D.
 - v0.2 (2026-11-16): Godot 4.3, 3D low-poly procedural, app Android nativa, auto-update por PCK.
+- v0.3: cidade única Vila Rubra (420x300m, canal+pontes, mar a sul, 4 bairros), mapa da REGIÃO (Esconderijo/Bar O Farol/Vila Rubra),
+  câmara 3ª pessoa (arrastar à direita roda), interiores com contentores para vasculhar + janela de saque em grelha, refém,
+  polícia a invadir (contagem), minimapa, mapa completo com destino/GPS, bússola, barra de armas, registo de eventos,
+  trânsito, peões, carros estacionados. Referência visual do utilizador: capturas do ROB RUN (só mecânicas, visual nosso).
 - Nome provisório: GOLPE · Cidade: Vila Rubra · Contacto: Zé Faísca (Bar O Farol).
 
 ## Núcleo de jogo (v0.1)
@@ -57,3 +61,7 @@ REGRA: nada copiado (mapa, itens, personagens, arte, sons, UI). Só mecânicas g
 - jogo/ projeto Godot · .github/workflows/build.yml · keys/golpe-test.keystore (SÓ teste; Play Store → chave em Secrets).
 - Ficheiros: boot/boot.gd (update), game/main.gd (jogo inteiro), game/data.gd (dados).
 - Unidades em metros. Zona 128x92, estradas RX=[22,90] RY=[19,64], porta do edifício principal virada a sul (câmara olha para norte).
+
+## Próximos passos pedidos pelo utilizador (por prioridade)
+- Qualidade visual: modelos 3D a sério (personagens animados, carros) → packs CC0 (Quaternius/Kenney/KayKit) descarregados no CI.
+- Mais funcionalidades dentro dos edifícios; menus com ar profissional; polícia jogável/multijogador mais tarde.
