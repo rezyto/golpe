@@ -61,8 +61,9 @@ jobs:
       - name: Teste de arranque (headless)
         working-directory: jogo
         run: |
-          timeout 30 godot --headless --quit-after 300 res://game/main.tscn 2>&1 | tee run.log || true
-          if grep -E "SCRIPT ERROR|Parse Error" run.log; then exit 1; fi
+          timeout 120 godot --headless res://game/main.tscn -- --autotest 2>&1 | grep -v "mesh_storage.h\|Parameter \"m\" is null" | tee run.log || true
+          if grep -E -A3 "SCRIPT ERROR|Parse Error" run.log; then exit 1; fi
+          grep -q "AUTOTEST OK" run.log
       - name: Exportar APK e pacote de atualização
         working-directory: jogo
         run: |

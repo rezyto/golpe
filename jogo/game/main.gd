@@ -94,6 +94,71 @@ func _ready() -> void:
 	setup_ui()
 	offline_income()
 	show_login()
+	if OS.get_cmdline_user_args().has("--autotest"):
+		autotest()
+
+
+func autotest() -> void:
+	## Teste automático no CI: percorre os sistemas principais e falha se houver erros de script.
+	var tr = get_tree()
+	S = default_save()
+	S["nick"] = "CI"
+	S["lvl"] = 6
+	S["money"] = 100000
+	login_ui.visible = false
+	hud.visible = true
+	enter_zone("home")
+	await tr.create_timer(0.5).timeout
+	for id in ["home", "bar", "armeiro", "stand", "imob"]:
+		open_shop(id)
+		await tr.process_frame
+		close_menu()
+	menu_pause()
+	await tr.process_frame
+	close_menu()
+	open_map()
+	await tr.process_frame
+	map_ui.visible = false
+	enter_zone("cafe")
+	await tr.create_timer(0.5).timeout
+	P["in_car"] = false
+	P["x"] = Z["door"]["x"]
+	P["y"] = Z["door"]["y"] + 1.0
+	await tr.process_frame
+	do_action()
+	heist["t"] = heist["need"] - 0.1
+	await tr.create_timer(0.5).timeout
+	print("autotest: saque ", S["inv"].size(), " wanted ", wanted)
+	wanted = 4
+	firing = true
+	await tr.create_timer(4.0).timeout
+	firing = false
+	print("autotest: policia ", police.size())
+	enter_zone("bar")
+	await tr.create_timer(0.3).timeout
+	open_shop("bar")
+	await tr.process_frame
+	close_menu()
+	enter_zone("t_docas")
+	P["in_car"] = false
+	P["x"] = Z["flag"]["x"] - 10.0
+	P["y"] = Z["flag"]["y"]
+	firing = true
+	await tr.create_timer(4.0).timeout
+	firing = false
+	print("autotest: gangue ", gang.size(), " hp ", S["hp"])
+	for g in gang:
+		g["hp"] = 0
+	await tr.create_timer(0.3).timeout
+	P["x"] = Z["flag"]["x"]
+	P["y"] = Z["flag"]["y"] + 1.0
+	P["in_car"] = false
+	await tr.create_timer(3.5).timeout
+	print("autotest: territorio ", S["terr"].has("t_docas"))
+	leave_zone()
+	await tr.process_frame
+	print("AUTOTEST OK")
+	tr.quit()
 
 
 func _read_txt(path: String, def: String) -> String:
