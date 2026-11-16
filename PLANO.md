@@ -4,7 +4,8 @@ Jogo original de crime multijogador para Android/iOS. Referência de GÉNERO: RO
 REGRA: nada copiado (mapa, itens, personagens, arte, sons, UI). Só mecânicas genéricas, tudo nosso.
 
 ## Estado
-- v0.1.0 (2026-11-16): protótipo web single-player (index.html), PWA instalável, auto-update no login.
+- v0.1 (web 2D) DESCARTADA: utilizador quer app nativa 3D.
+- v0.2 (2026-11-16): Godot 4.3, 3D low-poly procedural, app Android nativa, auto-update por PCK.
 - Nome provisório: GOLPE · Cidade: Vila Rubra · Contacto: Zé Faísca (Bar O Farol).
 
 ## Núcleo de jogo (v0.1)
@@ -21,15 +22,17 @@ REGRA: nada copiado (mapa, itens, personagens, arte, sons, UI). Só mecânicas g
 - Wipe por temporada 6–8 semanas; clãs, territórios PvP, polícia jogável (salário, patentes, prémio por detenção).
 
 ## Stack
-- Agora: HTML5 Canvas + JS puro, PWA, GitHub Pages, version.json (auto-update).
+- Agora: Godot 4.3 (GL Compatibility), GDScript, tudo gerado por código (main.gd), CI GitHub Actions.
 - Produção: Unity (URP mobile) + Photon Fusion ou FishNet (servidor autoritativo) + Edgegap/Hathora/GameLift (EU + Brasil).
 - Backend contas/economia: Nakama ou PlayFab. Updates nativos: Unity Addressables (conteúdo) + loja (binário).
 - Monetização: cosméticos, carros skin, passe de temporada. NUNCA vender armas (sem pay-to-win).
 
 ## Auto-update (como funciona)
-- version.json no repositório. Login lê version.json?t=… ; se versão > GAME_VERSION → mostra notas → recarrega.
-- sw.js network-first: online vai sempre buscar a nova; offline usa cache.
-- Para lançar update: mudar GAME_VERSION em index.html + version.json, commit, push. Pronto.
+- CI publica no Release 'latest': golpe.apk, game.pck, version.json {content, app}.
+- boot.gd: lê version.json → se content > instalado, descarrega game.pck → load_resource_pack → abre jogo.
+- content = 0.2.<run_number> (automático). app = jogo/boot/app_version.txt (subir só se mudar motor/permissões).
+- Para lançar update: push em jogo/. Mais nada.
+- Não posso descarregar o Godot no workspace (bloqueado) → testes só no CI (check-only + arranque headless).
 
 ## Ferramentas / skills Claude úteis
 - app-cloning: SÓ em modo clean-room (mapa de mecânicas, conteúdo original).
@@ -49,9 +52,8 @@ REGRA: nada copiado (mapa, itens, personagens, arte, sons, UI). Só mecânicas g
 - Informadores vendem pistas (cofre aberto, menos guardas). Leilão de loot raro. Eventos semanais (camião blindado).
 - Reputação por bairro; tréguas entre clãs; seguro de carro; carros roubados com GPS.
 
+
 ## Repositório (rezyto/golpe)
-- web/ → GitHub Pages (workflow pages.yml). app/ → APK via workflow android.yml → Releases (golpe.apk).
-- APK = casca que abre https://rezyto.github.io/golpe/?shell=X. Jogo atualiza sem reinstalar.
-- Nova APK só se mudar app/: subir version em app/package.json + apk.version em web/version.json.
-- Chave app/golpe-test.keystore é SÓ de teste. Antes da Play Store: chave nova em GitHub Secrets.
-- iOS: PWA pelo Safari até haver conta Apple Developer (99€/ano) → depois Capacitor iOS + TestFlight.
+- jogo/ projeto Godot · .github/workflows/build.yml · keys/golpe-test.keystore (SÓ teste; Play Store → chave em Secrets).
+- Ficheiros: boot/boot.gd (update), game/main.gd (jogo inteiro), game/data.gd (dados).
+- Unidades em metros. Zona 128x92, estradas RX=[22,90] RY=[19,64], porta do edifício principal virada a sul (câmara olha para norte).

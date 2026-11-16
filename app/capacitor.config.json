@@ -1,7 +1,0 @@
-{
-  "appId": "pt.rezyto.golpe",
-  "appName": "GOLPE",
-  "webDir": "www",
-  "server": { "allowNavigation": ["rezyto.github.io"], "androidScheme": "https" },
-  "android": { "backgroundColor": "#14161b" }
-}
