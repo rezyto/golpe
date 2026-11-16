@@ -108,6 +108,8 @@ var fac_cache = {}
 var save_t = 0.0
 var reset_arm = 0.0
 var vans = []
+var cam_dbg = Vector3.ZERO
+var ui_font: Font
 var icon_cache = {}
 var loot_mode = "loot"
 var inv_sel = -1
@@ -203,6 +205,14 @@ func shots() -> void:
 			snap_cam = true
 			await tr.create_timer(0.8).timeout
 			await shot("07_rua_a_pe")
+			P["ang"] = PI / 2
+			cam_dbg = Vector3(0.6, 1.5, 2.4)
+			await tr.create_timer(0.5).timeout
+			await shot("08_personagem_frente")
+			cam_dbg = Vector3(-1.2, 1.6, -2.4)
+			await tr.create_timer(0.3).timeout
+			await shot("09_personagem_costas")
+			cam_dbg = Vector3.ZERO
 			P["y"] = p["y"] + 1.0
 		enter_interior(p)
 		await tr.create_timer(0.8).timeout
@@ -606,6 +616,9 @@ func setup_3d() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 0.9
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.1
+	env.adjustment_saturation = 0.8
 	env.fog_enabled = true
 	env.fog_light_color = Color("#d3c6ae")
 	env.fog_density = 0.0065
@@ -617,7 +630,7 @@ func setup_3d() -> void:
 	sun.light_energy = 1.3
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 55.0
-	sun.rotation_degrees = Vector3(-50, -35, 0)
+	sun.rotation_degrees = Vector3(-36, -38, 0)
 	add_child(sun)
 	cam = Camera3D.new()
 	cam.fov = 60.0
@@ -864,7 +877,101 @@ func has_models() -> bool:
 	return scene_of(CITY_DIR + "car_sedan.gltf") != null
 
 
+const HUMAN = "res://game/chars/AnimationLibrary_Godot_Standard.gltf"
+const SKINS = ["#e0b48c", "#c98f62", "#8d5a3b", "#f0c9a4", "#6b4226"]
+const HAIRS = ["#1c1512", "#3b2716", "#6b4a2a", "#b8893a", "#8a8a8a", "#a33a1e"]
+var dbg_head = Vector3(0.0, 0.1, 0.015)
+var dbg_fwd = Vector3(0, 0, 1)
+
+
 func make_char(model: String, armed: bool, fallback_shirt: String) -> Node3D:
+	## pessoa de proporções reais (Quaternius Universal Animation Library, CC0) vestida por código
+	var hs = scene_of(HUMAN)
+	if hs == null:
+		return make_char_toy(model, armed, fallback_shirt)
+	var pivot = Node3D.new()
+	var inst: Node3D = hs.instantiate()
+	inst.rotation.y = PI / 2
+	pivot.add_child(inst)
+	var masked = model.begins_with("Rogue")
+	var main = fallback_shirt
+	var second = "#2b3240"
+	if model == "Rogue":
+		main = "#23262c"
+		second = "#3b4049"
+	elif model == "Rogue_Hooded":
+		main = "#4b2a5e"
+		second = "#1f1a26"
+	else:
+		second = ["#2b3240", "#3a3a3a", "#4a3a2a", "#1f2a44", "#55504a"][randi() % 5]
+	var m_main = mat(main, 0.85)
+	var m_sec = mat(second, 0.8)
+	for mi in inst.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = (mi as MeshInstance3D).mesh
+		for si in mesh.get_surface_count():
+			var m0 = mesh.surface_get_material(si)
+			var nm = m0.resource_name if m0 != null else ""
+			(mi as MeshInstance3D).set_surface_override_material(si, m_sec if nm.contains("Joint") else m_main)
+	var sks = inst.find_children("*", "Skeleton3D", true, false)
+	if sks.size() > 0:
+		var sk: Skeleton3D = sks[0]
+		var head = BoneAttachment3D.new()
+		head.bone_name = "DEF-head"
+		sk.add_child(head)
+		var skin = mat(SKINS[randi() % SKINS.size()], 0.7)
+		var hc = dbg_head
+		if masked:
+			ball(Vector3(0.118, 0.14, 0.128), m_main, hc, head)
+			box(Vector3(0.15, 0.035, 0.02), skin, hc + Vector3(0, 0.02, 0) + dbg_fwd * 0.118, head, false)
+		else:
+			ball(Vector3(0.112, 0.135, 0.122), skin, hc, head)
+			var hair = mat(HAIRS[randi() % HAIRS.size()], 0.9)
+			ball(Vector3(0.12, 0.1, 0.13), hair, hc + Vector3(0, 0.055, 0) - dbg_fwd * 0.02, head)
+			box(Vector3(0.03, 0.03, 0.03), skin, hc + Vector3(0, -0.01, 0) + dbg_fwd * 0.122, head, false)
+			for ex in [-0.04, 0.04]:
+				box(Vector3(0.022, 0.014, 0.01), mat("#1a1a1a"), hc + Vector3(ex, 0.025, 0) + dbg_fwd * 0.112, head, false)
+		if armed:
+			var hand = BoneAttachment3D.new()
+			hand.bone_name = "DEF-hand.R"
+			sk.add_child(hand)
+			box(Vector3(0.035, 0.2, 0.05), mat("#141414", 0.35, 0.7), Vector3(0, 0.14, 0.03), hand, false)
+			box(Vector3(0.033, 0.06, 0.1), mat("#141414", 0.35, 0.7), Vector3(0, 0.07, -0.01), hand, false)
+		if model == "Rogue":
+			var back = BoneAttachment3D.new()
+			back.bone_name = "DEF-spine.003"
+			sk.add_child(back)
+			box(Vector3(0.3, 0.34, 0.16), mat("#15171a", 0.9), Vector3(0, 0.02, 0) - dbg_fwd * 0.17, back)
+			box(Vector3(0.22, 0.1, 0.05), mat("#2a2e35", 0.9), Vector3(0, -0.06, 0) - dbg_fwd * 0.26, back, false)
+	var aps = inst.find_children("*", "AnimationPlayer", true, false)
+	if aps.size() > 0:
+		var ap: AnimationPlayer = aps[0]
+		for an in ap.get_animation_list():
+			if an.contains("Loop") or an in ["Pistol_Shoot", "Interact", "Fixing_Kneeling", "Pistol_Aim_Neutral"]:
+				ap.get_animation(an).loop_mode = Animation.LOOP_LINEAR
+		pivot.set_meta("ap", ap)
+		pivot.set_meta("cur", "")
+		pivot.set_meta("human", true)
+		pivot.set_meta("armed", armed)
+		play_anim(pivot, "Idle_Loop")
+	return pivot
+
+
+func ball(radii: Vector3, m: Material, pos: Vector3, parent: Node3D) -> MeshInstance3D:
+	var mi = MeshInstance3D.new()
+	var sm = SphereMesh.new()
+	sm.radius = 1.0
+	sm.height = 2.0
+	sm.radial_segments = 14
+	sm.rings = 8
+	mi.mesh = sm
+	mi.scale = radii
+	mi.material_override = m
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
+
+
+func make_char_toy(model: String, armed: bool, fallback_shirt: String) -> Node3D:
 	var ps = scene_of(CHAR_DIR + model + ".glb")
 	if ps == null:
 		return make_person(fallback_shirt, "#2b3240", armed)
@@ -908,7 +1015,20 @@ func play_anim(m: Node3D, an: String) -> void:
 
 
 func animate_char(m: Node3D, phase: float, speed: float, shooting = false, hands_up = false) -> void:
-	if m.has_meta("ap"):
+	if m.has_meta("human"):
+		if hands_up:
+			play_anim(m, "Crouch_Idle_Loop")
+		elif shooting:
+			play_anim(m, "Pistol_Shoot")
+		elif speed > 7.5:
+			play_anim(m, "Sprint_Loop")
+		elif speed > 2.6:
+			play_anim(m, "Jog_Fwd_Loop")
+		elif speed > 0.4:
+			play_anim(m, "Walk_Loop")
+		else:
+			play_anim(m, "Pistol_Idle_Loop" if m.get_meta("armed", false) else "Idle_Loop")
+	elif m.has_meta("ap"):
 		if hands_up:
 			play_anim(m, "Sit_Floor_Idle")
 		elif shooting:
@@ -1481,7 +1601,8 @@ func build_world() -> void:
 			box(Vector3(minf(w * 0.7, 16.0), 1.6, 0.2), mat("#" + shop_c.darkened(0.45).to_html(false)), Vector3(bcx, 4.9, front + 0.1), world, false)
 			var lab = Label3D.new()
 			lab.text = b["label"]
-			lab.font_size = 96
+			lab.font = get_font()
+			lab.font_size = 110
 			lab.pixel_size = 0.012
 			lab.outline_size = 10
 			lab.modulate = Color("#fff3d6")
@@ -2091,7 +2212,8 @@ func build_container(c: Dictionary) -> void:
 		box(Vector3(c["w"] * 0.7, hh * 0.3, 0.05), mat("#26282d"), Vector3(cx, hh * 0.7, c["y"] + c["h"] + 0.02), world_int, false)
 	var lab = Label3D.new()
 	lab.text = c["n"]
-	lab.font_size = 34
+	lab.font = get_font()
+	lab.font_size = 40
 	lab.pixel_size = 0.007
 	lab.outline_size = 8
 	lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -2266,8 +2388,8 @@ func update_interior(dt: float) -> void:
 	var iv = cam_rel(input_vec())
 	P["px"] = P["x"]
 	P["py"] = P["y"]
-	P["x"] = P["x"] + iv.x * 5.0 * dt
-	P["y"] = P["y"] + iv.y * 5.0 * dt
+	P["x"] = P["x"] + iv.x * 4.2 * dt
+	P["y"] = P["y"] + iv.y * 4.2 * dt
 	if iv.length() > 0.1 and not firing:
 		P["ang"] = atan2(iv.y, iv.x)
 	push_out(P, 0.4)
@@ -2441,7 +2563,8 @@ func spawn_vans() -> void:
 		world.add_child(npc)
 		var lab = Label3D.new()
 		lab.text = "%s\n+30%% %s" % [ty["name"], D.CAT_NAMES[ty["cat"]]]
-		lab.font_size = 40
+		lab.font = get_font()
+		lab.font_size = 46
 		lab.pixel_size = 0.008
 		lab.outline_size = 10
 		lab.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -2881,8 +3004,8 @@ func update_game(dt: float) -> void:
 		P["y"] = car["y"]
 		P["ang"] = car["ang"]
 	else:
-		P["x"] = P["x"] + iv.x * 6.5 * dt
-		P["y"] = P["y"] + iv.y * 6.5 * dt
+		P["x"] = P["x"] + iv.x * 5.2 * dt
+		P["y"] = P["y"] + iv.y * 5.2 * dt
 		if iv.length() > 0.1 and not firing:
 			P["ang"] = atan2(iv.y, iv.x)
 		push_out(P, 0.45)
@@ -3176,9 +3299,15 @@ func render(dt: float) -> void:
 		P["phase"] = P["phase"] + mv * dt * 1.7
 		player_mesh.position = Vector3(P["x"], 0.25 if not inside else 0.0, P["y"])
 		player_mesh.rotation.y = -P["ang"]
-		animate_char(player_mesh, P["phase"], mv, firing)
+		if not search.is_empty() and player_mesh.has_meta("human"):
+			play_anim(player_mesh, "Interact" if search["kind"] != "door" else "Fixing_Kneeling")
+		else:
+			animate_char(player_mesh, P["phase"], mv, firing)
 	if inside and hostage_mesh and is_instance_valid(hostage_mesh):
-		animate_char(hostage_mesh, 0.0, 0.0, false, I["clerk"]["state"] in ["rendido", "amarrado"])
+		if I["clerk"]["state"] == "amarrado" and hostage_mesh.has_meta("human"):
+			play_anim(hostage_mesh, "Sitting_Idle_Loop")
+		else:
+			animate_char(hostage_mesh, 0.0, 0.0, false, I["clerk"]["state"] == "rendido")
 	var flash = int(t * 8.0) % 2 == 0
 	var near_p = {}
 	var nd = 9999.0
@@ -3262,6 +3391,9 @@ func render(dt: float) -> void:
 		cam_p = cam_p.lerp(want, 1.0 - exp(-dt * 12.0))
 	cam.position = cam_p
 	cam.look_at(focus, Vector3.UP)
+	if cam_dbg != Vector3.ZERO:
+		cam.position = Vector3(P["x"], 0, P["y"]) + cam_dbg
+		cam.look_at(Vector3(P["x"], 1.25, P["y"]), Vector3.UP)
 
 
 func cam_clip(from: Vector3, to: Vector3) -> Vector3:
@@ -3280,16 +3412,38 @@ func cam_clip(from: Vector3, to: Vector3) -> Vector3:
 func lbl(text: String, size = 20, col = Color("#ecebe6")) -> Label:
 	var l = Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", int(size * 1.15))
 	l.add_theme_color_override("font_color", col)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
 
+func get_font() -> Font:
+	if ui_font == null:
+		var fp = "res://game/fonts/BarlowCondensed-SemiBold.ttf"
+		ui_font = load(fp) if ResourceLoader.exists(fp) else ThemeDB.fallback_font
+	return ui_font
+
+
+func panel_style() -> StyleBoxFlat:
+	var s = StyleBoxFlat.new()
+	s.bg_color = Color(0.065, 0.07, 0.085, 0.97)
+	s.set_corner_radius_all(2)
+	s.border_color = GOLD
+	s.border_width_top = 3
+	s.content_margin_left = 18
+	s.content_margin_right = 18
+	s.content_margin_top = 14
+	s.content_margin_bottom = 14
+	s.shadow_color = Color(0, 0, 0, 0.5)
+	s.shadow_size = 12
+	return s
+
+
 func flat(bg: Color, radius = 12, border = LINE, bw = 1) -> StyleBoxFlat:
 	var s = StyleBoxFlat.new()
 	s.bg_color = bg
-	s.set_corner_radius_all(radius)
+	s.set_corner_radius_all(mini(radius, 3))
 	s.border_color = border
 	s.set_border_width_all(bw)
 	s.content_margin_left = 12
@@ -3301,6 +3455,7 @@ func flat(bg: Color, radius = 12, border = LINE, bw = 1) -> StyleBoxFlat:
 
 func circle_style(bg: Color, border: Color, rad = 58) -> StyleBoxFlat:
 	var s = flat(bg, rad, border, 3)
+	s.set_corner_radius_all(rad)
 	s.corner_detail = 12
 	return s
 
@@ -3343,7 +3498,7 @@ func full(c: Control) -> void:
 
 func ui_button(text: String, cb: Callable, kind = "", disabled = false) -> Button:
 	var b = Button.new()
-	b.text = text
+	b.text = text.to_upper()
 	b.disabled = disabled
 	b.custom_minimum_size = Vector2(130, 46)
 	var bg = Color("#2f3440")
@@ -3366,7 +3521,7 @@ func ui_button(text: String, cb: Callable, kind = "", disabled = false) -> Butto
 	b.add_theme_color_override("font_hover_color", fg)
 	b.add_theme_color_override("font_pressed_color", fg)
 	b.add_theme_color_override("font_disabled_color", fg.darkened(0.4))
-	b.add_theme_font_size_override("font_size", 19)
+	b.add_theme_font_size_override("font_size", 22)
 	b.pressed.connect(cb)
 	return b
 
@@ -3398,7 +3553,8 @@ func setup_ui() -> void:
 	ui = CanvasLayer.new()
 	add_child(ui)
 	var th = Theme.new()
-	th.default_font_size = 20
+	th.default_font_size = 22
+	th.default_font = get_font()
 	# --- HUD
 	hud = Control.new()
 	full(hud)
@@ -3631,7 +3787,7 @@ func build_modal_ui(th: Theme) -> void:
 	modal.theme = th
 	dark_bg(modal, 0.8)
 	var pc = PanelContainer.new()
-	pc.add_theme_stylebox_override("panel", flat(PANEL, 16, LINE, 1))
+	pc.add_theme_stylebox_override("panel", panel_style())
 	pc.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pc.anchor_left = 0.5
 	pc.anchor_right = 0.5
@@ -3847,7 +4003,7 @@ func _draw_overlay() -> void:
 	if mode == "login" or Z.is_empty() or not hud.visible:
 		return
 	var vs = overlay.size
-	var font = ThemeDB.fallback_font
+	var font = get_font()
 	if wanted > 0 and mode == "play":
 		var c = Color(0.88, 0.24, 0.24) if int(t * 3) % 2 == 0 else Color(0.24, 0.43, 0.88)
 		for i in 6:
@@ -3949,7 +4105,7 @@ func _draw_icon(ctl: Control, pos: Vector2, id: String, r: float) -> void:
 		col = Color("#666a70")
 	ctl.draw_circle(pos, r + 2.0, Color(0, 0, 0, 0.7))
 	ctl.draw_circle(pos, r, col)
-	ctl.draw_string(ThemeDB.fallback_font, pos + Vector2(-r, r * 0.45), ic[0], HORIZONTAL_ALIGNMENT_CENTER, r * 2, int(r * 1.2), Color("#111111"))
+	ctl.draw_string(get_font(), pos + Vector2(-r, r * 0.45), ic[0], HORIZONTAL_ALIGNMENT_CENTER, r * 2, int(r * 1.2), Color("#111111"))
 
 
 func _draw_player_arrow(ctl: Control, pos: Vector2, ang: float, sz: float) -> void:
@@ -4047,7 +4203,7 @@ func _draw_fullmap() -> void:
 	var s = sz.x / float(Z["w"])
 	var to_scr = func(v: Vector2) -> Vector2: return v * s
 	_map_draw_world(fullmap_area, to_scr, s, Rect2(0, 0, Z["w"], Z["h"]))
-	var font = ThemeDB.fallback_font
+	var font = get_font()
 	if Z["kind"] == "city":
 		for d in D.DISTRICTS:
 			fullmap_area.draw_string(font, Vector2(d["x"], d["y"]) * s + Vector2(-150, 0), d["name"], HORIZONTAL_ALIGNMENT_CENTER, 300, 20, Color(1, 1, 1, 0.35))
@@ -4294,7 +4450,7 @@ func build_loot_ui(th: Theme) -> void:
 	outer.add_child(hb)
 	for side in 2:
 		var pane = PanelContainer.new()
-		pane.add_theme_stylebox_override("panel", flat(Color(0.12, 0.13, 0.16, 0.97), 8, Color("#3a3f49"), 1))
+		pane.add_theme_stylebox_override("panel", panel_style())
 		pane.custom_minimum_size = Vector2(520, 470)
 		hb.add_child(pane)
 		var v = VBoxContainer.new()
@@ -4613,7 +4769,7 @@ func open_menu(title: String, render_fn: Callable) -> void:
 	joy = {}
 	cam_drag = {}
 	firing = false
-	modal_title.text = title
+	modal_title.text = title.to_upper()
 	modal_render = render_fn
 	refresh_menu()
 	modal.visible = true
@@ -4668,7 +4824,7 @@ func row(box: VBoxContainer, title: String, sub: String, btext: String, cb: Call
 		h.add_child(tr)
 	var v = VBoxContainer.new()
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(lbl(title, 19))
+	v.add_child(lbl(title.to_upper(), 19))
 	if sub != "":
 		var s = lbl(sub, 14, DIM)
 		s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
