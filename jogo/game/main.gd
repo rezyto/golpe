@@ -123,6 +123,102 @@ func _ready() -> void:
 	show_login()
 	if OS.get_cmdline_user_args().has("--autotest"):
 		autotest()
+	elif OS.get_cmdline_user_args().has("--shots"):
+		shots()
+
+
+func shot(name: String) -> void:
+	## captura de ecrã para revisão (CI com ecrã virtual)
+	for i in 4:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var dir = OS.get_environment("SHOTS_DIR")
+	if dir == "":
+		dir = "user://"
+	var img = get_viewport().get_texture().get_image()
+	img.save_png(dir + "/" + name + ".png")
+	print("shot ", name)
+
+
+func shots() -> void:
+	var tr = get_tree()
+	await tr.create_timer(0.5).timeout
+	await shot("01_login")
+	S = default_save()
+	S["nick"] = "Teste"
+	S["lvl"] = 6
+	S["money"] = 25000
+	S["weapons"] = ["p22", "p9", "smg"]
+	login_ui.visible = false
+	hud.visible = true
+	enter_place("home")
+	await tr.create_timer(1.5).timeout
+	await shot("02_casa")
+	open_region()
+	_region_select("city")
+	await shot("03_regiao")
+	region_ui.visible = false
+	enter_place("city")
+	await tr.create_timer(1.0).timeout
+	for i in 40:
+		car["spd"] = 12.0
+		await tr.process_frame
+	await tr.create_timer(0.8).timeout
+	await shot("04_cidade_carro")
+	var cafe = find_poi("cafe")
+	exit_car()
+	P["x"] = cafe["x"] + 3.0
+	P["y"] = cafe["y"] + 6.0
+	P["ang"] = -PI / 2
+	cam_yaw = 0.3
+	snap_cam = true
+	await tr.create_timer(1.0).timeout
+	await shot("05_rua_a_pe")
+	cam_yaw = PI * 0.8
+	snap_cam = true
+	await tr.create_timer(0.6).timeout
+	await shot("06_rua_outro_lado")
+	open_fullmap()
+	await shot("07_mapa_cidade")
+	close_fullmap()
+	for hid in ["cafe", "bomba", "hotel", "museu"]:
+		var p = find_poi(hid)
+		if p.is_empty():
+			continue
+		P["x"] = p["x"]
+		P["y"] = p["y"] + 1.0
+		enter_interior(p)
+		wanted = 0
+		await tr.create_timer(0.8).timeout
+		await shot("08_interior_" + hid)
+		if hid == "cafe":
+			var c = I["conts"][0]
+			P["x"] = c["x"] + c["w"] / 2.0
+			P["y"] = c["y"] + c["h"] + 0.6
+			start_search(c)
+			await tr.create_timer(0.6).timeout
+			await shot("09_a_vasculhar")
+			search["t"] = 999.0
+			await tr.create_timer(0.3).timeout
+			await shot("10_janela_saque")
+			close_loot()
+		exit_interior()
+		wanted = 0
+	open_shop("armeiro")
+	await shot("11_loja_armeiro")
+	close_menu()
+	var tv = find_poi("t_velho")
+	P["x"] = tv["x"] - 14.0
+	P["y"] = tv["y"] + 4.0
+	cam_yaw = -PI / 2
+	snap_cam = true
+	await tr.create_timer(1.5).timeout
+	await shot("12_territorio_gangue")
+	wanted = 3
+	await tr.create_timer(5.0).timeout
+	await shot("13_policia")
+	print("SHOTS OK")
+	tr.quit()
 
 
 func _read_txt(path: String, def: String) -> String:
