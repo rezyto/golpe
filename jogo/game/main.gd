@@ -14,7 +14,7 @@ const PURPLE = Color("#9a6ad0")
 
 var S = {}
 var mode = "login"
-var place = ""
+var cur_place = ""
 var Z = {}
 var blocks_now = []
 var world: Node3D
@@ -1157,7 +1157,7 @@ func free_entities() -> void:
 
 func enter_place(id: String) -> void:
 	free_entities()
-	place = id
+	cur_place = id
 	if id == "city":
 		Z = make_city()
 	else:
@@ -3276,8 +3276,8 @@ func _draw_region() -> void:
 		c.draw_circle(p, 14.0, col)
 		if n["id"] == region_pick:
 			c.draw_arc(p, 24.0, 0, TAU, 32, Color.WHITE, 3.0)
-	if place != "" and pts.has(place):
-		_draw_player_arrow(c, pts[place] + Vector2(0, -34), PI / 2, 12.0)
+	if cur_place != "" and pts.has(cur_place):
+		_draw_player_arrow(c, pts[cur_place] + Vector2(0, -34), PI / 2, 12.0)
 
 
 # =====================================================================
