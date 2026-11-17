@@ -357,6 +357,8 @@ func autotest() -> void:
 			search["t"] = 999.0
 			await tr.process_frame
 			await tr.process_frame
+			for it in loot_c.get("items", []):
+				it["hid"] = false
 			_loot_take_all()
 			close_loot()
 		firing = true
@@ -381,6 +383,8 @@ func autotest() -> void:
 	P["y"] = v["ty"] + 1.4
 	await tr.process_frame
 	do_action()
+	if mode == "loot":
+		close_loot()
 	if not search.is_empty():
 		search["t"] = 999.0
 	await tr.process_frame
@@ -4554,6 +4558,7 @@ func pane(title_size = 26) -> Dictionary:
 	v.add_child(sub)
 	var holder = CenterContainer.new()
 	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	holder.custom_minimum_size = Vector2(0, 450)
 	v.add_child(holder)
 	var g = GridView.new()
 	g.setup(self, 5, 4, 62.0)
@@ -4639,11 +4644,15 @@ func cont_dims(c: Dictionary) -> Vector2i:
 	return Vector2i(5, 4)
 
 
+func cell_for(c: int, r: int) -> float:
+	return clampf(minf(540.0 / c, 440.0 / r), 50.0, 92.0)
+
+
 func refresh_loot() -> void:
 	var d = bag_dims()
 	var gR = paneR["grid"]
 	var gL = paneL["grid"]
-	gR.setup(self, d.x, d.y, 62.0)
+	gR.setup(self, d.x, d.y, cell_for(d.x, d.y))
 	gR.items = S["inv"]
 	gR.selected = inv_sel
 	gR.price_fn = null
@@ -4656,7 +4665,7 @@ func refresh_loot() -> void:
 	gL.visible = true
 	if loot_mode == "loot":
 		var cd = cont_dims(loot_c)
-		gL.setup(self, cd.x, cd.y, 62.0)
+		gL.setup(self, cd.x, cd.y, cell_for(cd.x, cd.y))
 		gL.items = loot_c["items"]
 		gL.price_fn = null
 		paneL["title"].text = str(loot_c["n"]).to_upper()
@@ -4681,7 +4690,7 @@ func refresh_loot() -> void:
 		loot_btn.text = "VENDER TUDO"
 		loot_btn.disabled = false
 	else:
-		gL.setup(self, 4, 3, 62.0)
+		gL.setup(self, 4, 3, cell_for(4, 3))
 		var eq = []
 		var ids = []
 		for tl in D.TOOLS:
@@ -4780,7 +4789,7 @@ func update_reveal(dt: float) -> void:
 			it["flash"] = maxf(0.0, float(it["flash"]) - dt * 1.6)
 	for it in loot_c["items"]:
 		if it.get("hid", false):
-			var need = 0.35 + 0.22 * item_tier(it)
+			var need = 0.25 + 0.18 * item_tier(it)
 			it["rev"] = float(it.get("rev", 0.0)) + dt
 			if it["rev"] >= need:
 				it["hid"] = false

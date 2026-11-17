@@ -90,8 +90,11 @@ func _draw() -> void:
 		if fl > 0.0:
 			draw_rect(r.grow(fl * 6.0), Color(tc.r, tc.g, tc.b, fl * 0.5), false, 4.0)
 			draw_rect(r, Color(1, 1, 1, fl * 0.35))
+		var szi = game.item_size(it["id"])
+		if szi.x >= 2 and cell >= 60.0:
+			draw_string(font, r.position + Vector2(6, 20), game.item_def(it["id"])["n"], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 10, 15, Color(1, 1, 1, 0.75))
 		if it["id"] != "cash" and int(it.get("q", 1)) > 1:
-			draw_string(font, r.position + Vector2(4, 18), "×%d" % it["q"], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
+			draw_string(font, Vector2(r.position.x, r.position.y + 20), "×%d " % it["q"], HORIZONTAL_ALIGNMENT_RIGHT, r.size.x, 18, Color.WHITE)
 		var val = game.stack_value(it)
 		var txt = ""
 		var tcol = Color("#e8dfc8")
