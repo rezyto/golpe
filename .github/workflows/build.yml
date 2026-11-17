@@ -70,7 +70,7 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 > /dev/null 2>&1 || true
           mkdir -p $GITHUB_WORKSPACE/out/shots
-          SHOTS_DIR=$GITHUB_WORKSPACE/out/shots timeout 400 xvfb-run -a -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --resolution 1280x720 res://game/main.tscn -- --shots 2>&1 | grep -v "mesh_storage" | tail -40 || true
+          SHOTS_DIR=$GITHUB_WORKSPACE/out/shots timeout 800 xvfb-run -a -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --resolution 1280x720 res://game/main.tscn -- --shots 2>&1 | grep -v "mesh_storage" | tail -40 || true
           ls -la $GITHUB_WORKSPACE/out/shots
           cd $GITHUB_WORKSPACE/out/shots
           git init -q && git checkout -q -b capturas && git add . && git -c user.name=ci -c user.email=ci@golpe commit -qm "capturas ${GITHUB_SHA::7}"

@@ -710,7 +710,7 @@ func setup_3d() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 0.7
 	env.glow_enabled = true
-	env.glow_intensity = 0.4
+	env.glow_intensity = 0.2
 	env.glow_bloom = 0.04
 	env.glow_hdr_threshold = 1.1
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
@@ -725,7 +725,7 @@ func setup_3d() -> void:
 	add_child(we)
 	sun = DirectionalLight3D.new()
 	sun.light_color = Color("#ffd9a6")
-	sun.light_energy = 1.45
+	sun.light_energy = 1.2
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 55.0
 	sun.rotation_degrees = Vector3(-36, -38, 0)
@@ -1424,13 +1424,12 @@ func tex_ground(kind: String) -> StandardMaterial3D:
 			for gx in range(0, 256, 11):
 				var jx = rng.randi() % 3 - 1
 				var jy = rng.randi() % 3 - 1
-				var v = 0.86 + rng.randf() * 0.1
-				img.fill_rect(Rect2i(gx + 1 + jx, gy + 1 + jy, 9, 9), Color(v, v * 0.985, v * 0.95))
+				var v = 0.68 + rng.randf() * 0.09
+				img.fill_rect(Rect2i(gx + 1 + jx, gy + 1 + jy, 9, 9), Color(v, v * 0.98, v * 0.94))
 		for gx in range(0, 256, 2):
-			var wy = 128 + int(sin(gx * 0.049) * 40.0)
-			for k in 3:
-				img.fill_rect(Rect2i(gx, wy + k * 11, 2, 9), Color("#2a2a2c"))
-		sc = 1.0 / 3.0
+			var wy = 128 + int(sin(gx * 0.0245) * 70.0)
+			img.fill_rect(Rect2i(gx, wy, 2, 6), Color("#4a4a4c"))
+		sc = 1.0 / 7.0
 		rough = 0.8
 	elif kind == "relva":
 		img.fill(Color("#5b7a45"))
@@ -1442,7 +1441,7 @@ func tex_ground(kind: String) -> StandardMaterial3D:
 		img.fill(Color("#a39a88"))
 		for gy in range(0, 256, 32):
 			for gx in range(0, 256, 32):
-				var v2 = 0.6 + rng.randf() * 0.1
+				var v2 = 0.5 + rng.randf() * 0.08
 				img.fill_rect(Rect2i(gx + 1, gy + 1, 30, 30), Color(v2, v2 * 0.96, v2 * 0.9))
 		noisy(img, 0.04, 31)
 		sc = 1.0 / 4.0
@@ -1483,8 +1482,10 @@ func place_proc_building(b: Dictionary, parent: Node3D, xf: Dictionary) -> void:
 		var lab = Label3D.new()
 		lab.text = SHOP_NAMES[r.randi() % SHOP_NAMES.size()]
 		lab.font = get_font()
-		lab.font_size = 52
-		lab.pixel_size = 0.01
+		lab.font_size = 64
+		lab.pixel_size = 0.009
+		lab.outline_size = 6
+		lab.outline_modulate = Color(0, 0, 0, 0.5)
 		lab.outline_size = 0
 		lab.modulate = Color("#f4efe2")
 		lab.position = Vector3(cx, 2.86, fz + out * 0.04)
@@ -1568,7 +1569,7 @@ func build_streets(parent: Node3D) -> void:
 			edge.append(Transform3D(Basis(Vector3.UP, PI / 2).scaled(Vector3(vmax + 200, 1, 1)), Vector3(x + side * (rw - 0.45), 0.028, (vmax - 200.0) / 2.0)))
 	var em = BoxMesh.new()
 	em.size = Vector3(1.0, 0.01, 0.14)
-	mm_add(parent, em, mat("#e6e3da"), edge, false)
+	mm_add(parent, em, mat("#d8d4c8", 1.0), edge, false)
 	var holes = []
 	var rr = RandomNumberGenerator.new()
 	rr.seed = hash(Z["id"]) + 5
