@@ -4683,8 +4683,8 @@ func _draw_minimap() -> void:
 		var view = Rect2(pp - center / s, sz / s)
 		_map_draw_world(minimap, to_scr, s, view)
 		for p in Z["pois"]:
-		if p["kind"] in ["rear", "alarm"]:
-			continue
+			if p["kind"] in ["rear", "alarm"]:
+				continue
 			var sp = to_scr.call(Vector2(p["x"], p["y"]))
 			if Rect2(Vector2(-10, -10), sz + Vector2(20, 20)).has_point(sp):
 				_draw_icon(minimap, sp, p["id"], 8.0)
