@@ -5,17 +5,17 @@ extends Control
 signal tapped(grid, item)
 signal dropped(from_grid, to_grid, item, cell)
 
-var game = null
+var game: Variant = null
 var cols = 5
 var rows = 4
 var cell = 64.0
 var items = []
-var price_fn = null
-var selected = null
-var _press_item = null
+var price_fn: Variant = null
+var selected: Variant = null
+var _press_item: Variant = null
 var _press_pos = Vector2.ZERO
 var _hover_cell = Vector2i(-1, -1)
-var _hover_item = null
+var _hover_item: Variant = null
 var _hover_ok = false
 var _time = 0.0
 

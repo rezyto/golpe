@@ -113,7 +113,7 @@ var anims_logged = false
 var ui_font: Font
 var icon_cache = {}
 var loot_mode = "loot"
-var inv_sel = null
+var inv_sel: Variant = null
 var paneL = {}
 var paneR = {}
 var sell_van = {}
