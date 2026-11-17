@@ -78,13 +78,13 @@ const CAT_NAMES := {"joias": "Joias", "eletronica": "Eletrónica", "bebidas": "B
 
 const HEISTS := {
 	"cafe": {"name": "Café Central", "lvl": 1, "cd": 120, "stars": 1, "xp": 25, "col": "#8a5a34"},
-	"bomba": {"name": "Bomba Estrela", "lvl": 1, "cd": 180, "stars": 2, "xp": 40, "col": "#b23b2e"},
-	"farmacia": {"name": "Farmácia Sol", "lvl": 2, "cd": 200, "stars": 2, "xp": 50, "col": "#3f9a6a"},
-	"garrafeira": {"name": "Garrafeira Tonel", "lvl": 2, "cd": 220, "stars": 2, "xp": 55, "col": "#6a2a3a"},
-	"hotel": {"name": "Hotel Atlântida", "lvl": 3, "cd": 300, "stars": 3, "xp": 90, "col": "#3d5f8a"},
-	"joalharia": {"name": "Joalharia Aurora", "lvl": 4, "cd": 360, "stars": 3, "xp": 140, "col": "#2f3a5a", "story": 1},
-	"museu": {"name": "Museu da Cidade", "lvl": 5, "cd": 480, "stars": 4, "xp": 200, "col": "#c9b98f"},
-	"banco": {"name": "Banco de Vila Rubra", "lvl": 6, "cd": 600, "stars": 5, "xp": 350, "col": "#5a6068", "story": 2},
+	"bomba": {"name": "Bomba Estrela", "lvl": 1, "cd": 180, "stars": 2, "xp": 40, "col": "#b23b2e", "rear": false},
+	"farmacia": {"name": "Farmácia Sol", "lvl": 2, "cd": 200, "stars": 2, "xp": 50, "col": "#3f9a6a", "alarm": true},
+	"garrafeira": {"name": "Garrafeira Tonel", "lvl": 2, "cd": 220, "stars": 2, "xp": 55, "col": "#6a2a3a", "alarm": true},
+	"hotel": {"name": "Hotel Atlântida", "lvl": 3, "cd": 300, "stars": 3, "xp": 90, "col": "#3d5f8a", "alarm": true},
+	"joalharia": {"name": "Joalharia Aurora", "lvl": 4, "cd": 360, "stars": 3, "xp": 140, "col": "#2f3a5a", "story": 1, "alarm": true},
+	"museu": {"name": "Museu da Cidade", "lvl": 5, "cd": 480, "stars": 4, "xp": 200, "col": "#c9b98f", "alarm": true},
+	"banco": {"name": "Banco de Vila Rubra", "lvl": 6, "cd": 600, "stars": 5, "xp": 350, "col": "#5a6068", "story": 2, "alarm": true},
 }
 
 const TERRS := {

@@ -110,6 +110,17 @@ var reset_arm = 0.0
 var vans = []
 var cam_dbg = Vector3.ZERO
 var anims_logged = false
+var cam_shake = 0.0
+var skid_pool = []
+var skid_i = 0
+var mg = {}
+var mg_ui: Control
+var mg_title: Label
+var mg_sub: Label
+var mg_bar: Control
+var mg_btn: Button
+var lbl_speed: Label
+var panic_t = 0.0
 var ui_font: Font
 var icon_cache = {}
 var loot_mode = "loot"
@@ -186,7 +197,7 @@ func shots() -> void:
 	enter_place("city")
 	await tr.create_timer(1.0).timeout
 	for i in 40:
-		car["spd"] = 12.0
+		car["vx"] = 12.0
 		await tr.process_frame
 	await tr.create_timer(0.8).timeout
 	await shot("05_cidade_carro")
@@ -261,6 +272,32 @@ func shots() -> void:
 		I["searched"] = 0
 		exit_interior()
 		wanted = 0
+	var ap2 = find_poi("a_joalharia")
+	if not ap2.is_empty():
+		P["x"] = ap2["x"] + 2.0
+		P["y"] = ap2["y"] - 3.5
+		P["ang"] = PI / 2
+		cam_yaw = PI
+		snap_cam = true
+		await tr.create_timer(1.0).timeout
+		await shot("16_traseiras_alarme")
+		start_minigame("alarm", "joalharia")
+		await tr.create_timer(0.4).timeout
+		await shot("17_minijogo_alarme")
+		close_minigame()
+	enter_car()
+	car["ang"] = 0.0
+	car["x"] = 40.0
+	car["y"] = 96.9
+	snap_cam = true
+	for k in 70:
+		drive_player(car, Vector2(1, 0), 0.03, car_def())
+		await tr.process_frame
+	for k in 25:
+		drive_player(car, Vector2(0.3, 1), 0.03, car_def())
+		await tr.process_frame
+	await shot("18_conducao_curva")
+	exit_car()
 	open_shop("armeiro")
 	await shot("20_armeiro")
 	close_menu()
@@ -370,6 +407,43 @@ func autotest() -> void:
 		await tr.create_timer(0.3).timeout
 		print("autotest: saiu ", not inside, " wanted ", wanted)
 		wanted = 0
+	# alarme e traseiras do hotel
+	S["cds"].erase("hotel")
+	var ap = find_poi("a_hotel")
+	P["x"] = ap["x"]
+	P["y"] = ap["y"] - 1.0
+	await tr.process_frame
+	do_action()
+	for k in 3:
+		mg["pos"] = mg["zc"]
+		_minigame_press()
+	print("autotest: alarme desligado ", alarm_off("hotel"), " modo ", mode)
+	S["tools"].append("gazuas")
+	var rp = find_poi("r_hotel")
+	P["x"] = rp["x"]
+	P["y"] = rp["y"] - 1.0
+	await tr.process_frame
+	do_action()
+	for k in 2:
+		mg["pos"] = mg["zc"]
+		_minigame_press()
+	await tr.process_frame
+	do_action()
+	await tr.create_timer(0.3).timeout
+	print("autotest: entrou traseiras ", inside, " rear ", I.get("rear", false), " alarme ", I.get("alarm_on", true), " clerk ", I.get("clerk", {}).get("state", ""))
+	P["x"] = float(I["def"]["bdoor"])
+	P["y"] = 0.5
+	await tr.create_timer(0.3).timeout
+	print("autotest: saiu traseiras ", not inside, " wanted ", wanted)
+	wanted = 0
+	# condução: acelerar contra um prédio
+	enter_car()
+	car["ang"] = 0.0
+	for k in 40:
+		await tr.process_frame
+		drive_player(car, Vector2(1, 0), 0.05, car_def())
+	print("autotest: velocidade ", int(car["spd"] * 3.6), " km/h, carro ", int(S["car_hp"]))
+	exit_car()
 	var v = vans[0]
 	P["x"] = v["nx"]
 	P["y"] = v["ny"]
@@ -1175,7 +1249,8 @@ func place_street_props(r: RandomNumberGenerator) -> void:
 # =====================================================================
 func base_zone(id: String, w: float, h: float, rw: float, rx: Array, ry: Array) -> Dictionary:
 	return {"id": id, "kind": "", "w": w, "h": h, "rw": rw, "rx": rx, "ry": ry, "blocks": [], "lots": [], "trees": [],
-		"pois": [], "water": [], "parked": [], "spawn": {}, "armed": false, "exits": []}
+		"pois": [], "water": [], "parked": [], "spawn": {}, "armed": false, "exits": [],
+		"alarm_off": {}, "rear_open": {}, "alarm_trip": {}, "alarm_leds": {}}
 
 
 func fill_lot(z: Dictionary, r: RandomNumberGenerator, bx: float, by: float, bw: float, bh: float) -> void:
@@ -1216,8 +1291,16 @@ func poi_building(z: Dictionary, id: String, bx: float, by: float, bw: float, bh
 	var ty = by + bh - th - 2.5
 	z["blocks"].append({"x": tx, "y": ty, "w": tw, "h": th, "col": def["col"], "label": def["name"], "main": true, "hgt": 12.0 if kind == "heist" else 8.0})
 	z["pois"].append({"id": id, "kind": kind, "x": tx + tw / 2.0, "y": ty + th + 0.8, "name": def["name"]})
+	if kind == "heist":
+		if def.get("rear", true):
+			z["pois"].append({"id": "r_" + id, "ref": id, "kind": "rear", "x": tx + tw * 0.72, "y": ty - 0.9, "wy": ty, "name": def["name"]})
+		if def.get("alarm", false):
+			z["pois"].append({"id": "a_" + id, "ref": id, "kind": "alarm", "x": tx + tw * 0.3, "y": ty - 0.9, "wy": ty, "name": def["name"]})
 	for k in 5:
-		z["trees"].append({"x": bx + 2.0 + r.randf() * (bw - 4.0), "y": by + 1.5 + r.randf() * maxf(1.0, ty - by - 3.0), "r": 1.0 + r.randf() * 0.8})
+		var tx2 = bx + 2.0 + r.randf() * (bw - 4.0)
+		if kind == "heist" and absf(tx2 - (tx + tw * 0.5)) < tw * 0.45:
+			continue
+		z["trees"].append({"x": tx2, "y": by + 1.5 + r.randf() * maxf(1.0, ty - by - 3.0), "r": 1.0 + r.randf() * 0.8})
 
 
 func make_small(id: String) -> Dictionary:
@@ -1664,6 +1747,20 @@ func build_world() -> void:
 			var cl = box(Vector3(2.4, 1.5, 0.06), mat("#3cc48a") if S["terr"].has(p["id"]) else mat(D.TERRS[p["id"]]["col"]), Vector3(fx + 1.25, 5.4, fz), world)
 			flags[p["id"]] = cl
 			rings.append(make_ring(Vector3(fx, 0.35, fz), 3.8, 4.2, PURPLE))
+		elif p["kind"] == "rear":
+			var wz: float = p["wy"]
+			box(Vector3(1.5, 2.3, 0.14), mat("#3c4148", 0.35, 0.6), Vector3(p["x"], 1.4, wz - 0.06), world)
+			box(Vector3(0.1, 0.1, 0.12), mat("#c9ccd2", 0.3, 0.8), Vector3(p["x"] + 0.5, 1.35, wz - 0.16), world, false)
+			box(Vector3(0.6, 0.12, 0.3), unshaded(Color("#fff1c2")), Vector3(p["x"], 2.75, wz - 0.18), world, false)
+			box(Vector3(2.0, 0.08, 1.2), mat("#4a4d52"), Vector3(p["x"], 0.28, wz - 0.7), world, false)
+			model_inst("dumpster", Vector3.ONE * 4.0, 0.0, world, Vector3(p["x"] + 3.2, 0.25, wz - 1.2), 120.0)
+		elif p["kind"] == "alarm":
+			var wz2: float = p["wy"]
+			box(Vector3(0.6, 0.8, 0.12), mat("#e6e8ea", 0.4, 0.2), Vector3(p["x"], 1.6, wz2 - 0.06), world)
+			box(Vector3(0.36, 0.2, 0.04), mat("#1a1c20"), Vector3(p["x"], 1.75, wz2 - 0.14), world, false)
+			var led = box(Vector3(0.1, 0.1, 0.05), unshaded(RED), Vector3(p["x"] + 0.18, 1.35, wz2 - 0.14), world, false)
+			Z["alarm_leds"][p["ref"]] = led
+			box(Vector3(0.08, 1.2, 0.08), mat("#3a3a3a"), Vector3(p["x"] - 0.24, 0.85, wz2 - 0.1), world, false)
 		else:
 			rings.append(make_ring(Vector3(p["x"], 0.35, p["y"]), 1.2, 1.55, RED if p["kind"] == "heist" else GOLD))
 
@@ -1752,6 +1849,7 @@ func enter_place(id: String) -> void:
 	mode = "play"
 	spawn_life()
 	spawn_vans()
+	clear_skids()
 	refresh_hotbar()
 	feed_add("Chegaste a " + Z["name"])
 	save_game()
@@ -1884,7 +1982,7 @@ func update_life(dt: float) -> void:
 			var d = maxf(0.01, dist(c, car))
 			car["x"] = car["x"] + (car["x"] - c["x"]) / d * (3.4 - d) * 0.6
 			car["y"] = car["y"] + (car["y"] - c["y"]) / d * (3.4 - d) * 0.6
-			car["spd"] = car["spd"] * 0.4
+			set_car_speed_scale(0.4)
 			c["stop"] = 2.0
 		var m: Node3D = c["mesh"]
 		m.position = Vector3(c["x"], 0, c["y"])
@@ -1898,11 +1996,41 @@ func update_life(dt: float) -> void:
 		if dist(p, P) > 85.0:
 			p["mesh"].queue_free()
 			continue
+		if p.has("down"):
+			p["down"] = float(p["down"]) - dt
+			if p["down"] <= 0.0:
+				p["mesh"].queue_free()
+			else:
+				pk.append(p)
+			continue
+		if P["in_car"] and dist(p, car) < 1.8 and absf(float(car.get("spd", 0.0))) > 5.0:
+			p["down"] = 7.0
+			play_anim(p["mesh"], "Death01")
+			set_car_speed_scale(0.85)
+			cam_shake = maxf(cam_shake, 0.3)
+			wanted = mini(5, wanted + 1)
+			lost_t = 0.0
+			feed_add("Atropelaste um peão", RED)
+			pk.append(p)
+			continue
+		if panic_t > 0.0 and dist(p, P) < 35.0:
+			var away2 = Vector2(p["x"] - P["x"], p["y"] - P["y"]).normalized()
+			p["x"] = p["x"] + away2.x * 5.5 * dt
+			p["y"] = p["y"] + away2.y * 5.5 * dt
+			push_out(p, 0.4)
+			p["x"] = clampf(p["x"], 2.0, Z["w"] - 2.0)
+			p["y"] = clampf(p["y"], 2.0, minf(Z["h"] - 2.0, 252.0))
+			var m3: Node3D = p["mesh"]
+			m3.position = Vector3(p["x"], 0.25, p["y"])
+			m3.rotation.y = -away2.angle()
+			animate_char(m3, 0.0, 8.0)
+			pk.append(p)
+			continue
 		var spd: float = p["spd"] * (2.6 if wanted > 0 else 1.0)
 		var mv = Vector2(1, 0) if p["horiz"] else Vector2(0, 1)
 		mv *= p["dir"]
 		# desviar de carros que se aproximam
-		if P["in_car"] and dist(p, car) < 6.0 and absf(car["spd"]) > 3.0:
+		if P["in_car"] and dist(p, car) < 6.0 and absf(float(car.get("spd", 0.0))) > 3.0:
 			var away = Vector2(p["x"] - car["x"], p["y"] - car["y"]).normalized()
 			p["x"] = p["x"] + away.x * 6.0 * dt
 			p["y"] = p["y"] + away.y * 6.0 * dt
@@ -1927,6 +2055,340 @@ func update_life(dt: float) -> void:
 
 
 # =====================================================================
+#  CONDUÇÃO COM FÍSICA (aderência, derrapagem, travagem, marcha-atrás, choques)
+# =====================================================================
+func drive_player(c: Dictionary, iv: Vector2, dt: float, cd: Dictionary) -> void:
+	var maxs = float(cd["spd"]) * (0.55 if float(S["car_hp"]) < float(cd["hp"]) * 0.25 else 1.0)
+	var acc = float(cd["spd"]) * 0.5
+	var v = Vector2(c.get("vx", 0.0), c.get("vy", 0.0))
+	var a0: float = c["ang"]
+	var f0 = Vector2(cos(a0), sin(a0))
+	var vf0 = v.dot(f0)
+	var m = iv.length()
+	var throttle = 0.0
+	var braking = false
+	var turning = 0.0
+	if m > 0.15:
+		var ta = atan2(iv.y, iv.x)
+		var da = ang_diff(ta, a0)
+		var steer_to = ta
+		if absf(da) > 2.2 and vf0 < 2.0:
+			throttle = -0.5 * m
+			steer_to = ta + PI
+		elif absf(da) > 2.2:
+			braking = true
+		else:
+			throttle = m * (1.0 if absf(da) < 1.0 else 0.55)
+		var da2 = ang_diff(steer_to, a0)
+		var sp = absf(vf0)
+		var rate = 2.6 * clampf(sp / 3.5, 0.0, 1.0) * (1.0 - 0.45 * clampf(sp / maxs, 0.0, 1.0))
+		var turn = clampf(da2, -rate * dt, rate * dt)
+		if vf0 < -0.5:
+			turn = -turn if throttle >= 0 else turn
+		c["ang"] = a0 + turn
+		turning = turn / maxf(dt, 0.001)
+	var a: float = c["ang"]
+	var f = Vector2(cos(a), sin(a))
+	var rt = Vector2(-f.y, f.x)
+	var vf = v.dot(f)
+	var vl = v.dot(rt)
+	if braking:
+		vf = move_toward(vf, 0.0, 24.0 * dt)
+	elif throttle > 0.0:
+		if vf < 0.0:
+			vf = move_toward(vf, 0.0, 20.0 * dt)
+		else:
+			vf += acc * throttle * (1.0 - clampf(vf / maxs, 0.0, 1.0) * 0.9) * dt
+			vf = minf(vf, maxs)
+	elif throttle < 0.0:
+		if vf > 0.5:
+			vf = move_toward(vf, 0.0, 20.0 * dt)
+		else:
+			vf = maxf(vf + acc * throttle * dt, -maxs * 0.3)
+	else:
+		vf = move_toward(vf, 0.0, 4.0 * dt)
+	var grip = 9.0
+	if absf(vf) > maxs * 0.6 and absf(turning) > 1.0:
+		grip = 2.2
+	if braking and absf(vf) > 8.0:
+		grip = 4.0
+	vl *= exp(-grip * dt)
+	v = f * vf + rt * vl
+	var ox: float = c["x"]
+	var oy: float = c["y"]
+	c["x"] = ox + v.x * dt
+	c["y"] = oy + v.y * dt
+	var wx: float = c["x"]
+	var wy: float = c["y"]
+	if push_out(c, 1.85):
+		var n = Vector2(c["x"] - wx, c["y"] - wy)
+		if n.length() > 0.0001:
+			n = n.normalized()
+			var vn = v.dot(n)
+			if vn < 0.0:
+				v -= n * vn * 1.3
+				var impact = -vn
+				if impact > 5.0:
+					var dmg = (impact - 5.0) * 2.0
+					cam_shake = maxf(cam_shake, minf(1.0, impact / 18.0))
+					boom(c["x"] - n.x * 1.6, c["y"] - n.y * 1.6, Color("#ffd56a"), int(clampf(impact, 4, 16)))
+					if dmg > 3.0:
+						hurt_player(dmg)
+			v *= 0.9
+	c["x"] = clampf(c["x"], 0.3, Z["w"] - 0.3)
+	c["y"] = clampf(c["y"], 0.3, Z["h"] - 0.3)
+	c["vx"] = v.x
+	c["vy"] = v.y
+	var nvf = v.dot(f)
+	c["acc"] = lerpf(float(c.get("acc", 0.0)), (nvf - vf0) / maxf(dt, 0.001), 0.2)
+	c["yawrate"] = lerpf(float(c.get("yawrate", 0.0)), turning, 0.25)
+	c["spd"] = nvf
+	c["drift"] = absf(vl)
+	c["braking"] = braking
+	# marcas de pneus ao derrapar ou travar a fundo
+	c["skid_t"] = float(c.get("skid_t", 0.0)) - dt
+	if (absf(vl) > 2.6 or (braking and absf(vf) > 7.0)) and c["skid_t"] <= 0.0:
+		c["skid_t"] = 0.04
+		for side in [-0.82, 0.82]:
+			var p = Vector2(c["x"], c["y"]) - f * 1.35 + rt * side
+			add_skid(p, a)
+
+
+func add_skid(p: Vector2, ang: float) -> void:
+	if skid_pool.is_empty():
+		var sm = StandardMaterial3D.new()
+		sm.albedo_color = Color(0.05, 0.05, 0.05, 0.55)
+		sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var bm = BoxMesh.new()
+		bm.size = Vector3(0.55, 0.01, 0.24)
+		for i in 160:
+			var mi = MeshInstance3D.new()
+			mi.mesh = bm
+			mi.material_override = sm
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.visible = false
+			add_child(mi)
+			skid_pool.append(mi)
+	var s: MeshInstance3D = skid_pool[skid_i % skid_pool.size()]
+	skid_i += 1
+	s.visible = true
+	s.position = Vector3(p.x, 0.035, p.y)
+	s.rotation.y = -ang
+
+
+func clear_skids() -> void:
+	for s in skid_pool:
+		s.visible = false
+
+
+func car_visual(cm: Node3D, c: Dictionary, dt: float) -> void:
+	## inclinação da carroçaria nas curvas e ao acelerar/travar
+	var roll_t = clampf(float(c.get("spd", 0.0)) * float(c.get("yawrate", 0.0)) * 0.006, -0.09, 0.09)
+	var pitch_t = clampf(float(c.get("acc", 0.0)) * 0.004, -0.05, 0.05)
+	c["roll"] = lerpf(float(c.get("roll", 0.0)), roll_t, 1.0 - exp(-dt * 6.0))
+	c["pitch"] = lerpf(float(c.get("pitch", 0.0)), pitch_t, 1.0 - exp(-dt * 6.0))
+	cm.position = Vector3(c["x"], 0, c["y"])
+	cm.transform.basis = Basis(Vector3.UP, -float(c["ang"])) * Basis(Vector3(1, 0, 0), float(c["roll"])) * Basis(Vector3(0, 0, 1), float(c["pitch"]))
+
+
+func set_car_speed_scale(k: float) -> void:
+	car["vx"] = float(car.get("vx", 0.0)) * k
+	car["vy"] = float(car.get("vy", 0.0)) * k
+	car["spd"] = float(car.get("spd", 0.0)) * k
+
+
+# =====================================================================
+#  ENTRADAS DAS TRASEIRAS, PAINÉIS DE ALARME E MINI-JOGO
+# =====================================================================
+func alarm_off(id: String) -> bool:
+	return Z.get("alarm_off", {}).has(id)
+
+
+func outdoor_action(p: Dictionary) -> Dictionary:
+	var ref: String = p.get("ref", "")
+	if p["kind"] == "alarm":
+		if alarm_off(ref):
+			return {"l": "ALARME\nDESLIGADO", "off": true}
+		if Z["alarm_trip"].has(ref):
+			return {"l": "ALARME\nDISPARADO", "off": true}
+		return {"l": "DESLIGAR\nALARME", "f": func(): start_minigame("alarm", ref)}
+	if p["kind"] == "rear":
+		var lock = heist_locked(ref)
+		if lock != "":
+			return {"l": "BLOQUEADO\n" + lock, "off": true}
+		var left = float(S["cds"].get(ref, 0)) - now_ms()
+		if left > 0:
+			return {"l": "FECHADO\n" + mmss(left), "off": true}
+		if Z["rear_open"].has(ref):
+			return {"l": "ENTRAR", "f": func(): enter_interior(find_poi(ref), true)}
+		if has_tool("gazuas"):
+			return {"l": "GAZUAS", "f": func(): start_minigame("lock", ref)}
+		if has_tool("pe_cabra"):
+			return {"l": "ARROMBAR", "f": func(): search = {"kind": "rear", "ref": ref, "t": 0.0, "need": 3.5, "label": "A ARROMBAR A PORTA DAS TRASEIRAS"}}
+		return {"l": "PRECISAS\nFERRAMENTA", "off": true}
+	return {}
+
+
+func finish_rear(ref: String) -> void:
+	Z["rear_open"][ref] = true
+	if D.HEISTS[ref].get("alarm", false) and not alarm_off(ref):
+		Z["alarm_trip"][ref] = true
+		set_alarm_led(ref, RED)
+		toast("A porta tinha alarme!", RED)
+		feed_add("Alarme disparado: " + D.HEISTS[ref]["name"], RED)
+		wanted = maxi(wanted, 1)
+		lost_t = 0.0
+	else:
+		toast("Porta aberta", OK_C)
+	last_act = "?"
+
+
+func set_alarm_led(ref: String, col: Color) -> void:
+	if Z.has("alarm_leds") and Z["alarm_leds"].has(ref):
+		Z["alarm_leds"][ref].material_override = unshaded(col)
+
+
+func build_minigame_ui(th: Theme) -> void:
+	mg_ui = Control.new()
+	full(mg_ui)
+	mg_ui.theme = th
+	dark_bg(mg_ui, 0.55)
+	var cc = CenterContainer.new()
+	full(cc)
+	mg_ui.add_child(cc)
+	var pc = PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", panel_style())
+	pc.custom_minimum_size = Vector2(640, 0)
+	cc.add_child(pc)
+	var v = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	pc.add_child(v)
+	mg_title = lbl("", 28)
+	v.add_child(mg_title)
+	mg_sub = lbl("", 17, DIM)
+	v.add_child(mg_sub)
+	mg_bar = Control.new()
+	mg_bar.custom_minimum_size = Vector2(600, 90)
+	mg_bar.draw.connect(_draw_minigame)
+	v.add_child(mg_bar)
+	var h = HBoxContainer.new()
+	h.add_theme_constant_override("separation", 12)
+	v.add_child(h)
+	var cancel = ui_button("DESISTIR", close_minigame)
+	cancel.custom_minimum_size = Vector2(170, 64)
+	h.add_child(cancel)
+	mg_btn = ui_button("AGORA", _minigame_press, "g")
+	mg_btn.custom_minimum_size = Vector2(0, 64)
+	mg_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mg_btn.add_theme_font_size_override("font_size", 30)
+	h.add_child(mg_btn)
+	mg_ui.visible = false
+	ui.add_child(mg_ui)
+
+
+func start_minigame(kind: String, ref: String) -> void:
+	mode = "mini"
+	joy = {}
+	cam_drag = {}
+	firing = false
+	var rounds = 3 if kind == "alarm" else 2
+	mg = {"kind": kind, "ref": ref, "round": 0, "rounds": rounds, "pos": 0.0, "dir": 1.0, "speed": 0.75, "zc": randf_range(0.25, 0.8), "zw": 0.2, "flash": 0.0, "fail": 0.0}
+	if kind == "alarm":
+		mg_title.text = "PAINEL DE ALARME — " + D.HEISTS[ref]["name"].to_upper()
+		mg_sub.text = "Corta o fio quando a agulha estiver na zona verde. Se falhares, o alarme dispara."
+		mg_btn.text = "CORTAR"
+	else:
+		mg_title.text = "FECHADURA DAS TRASEIRAS"
+		mg_sub.text = "Roda a gazua e para na zona verde. Sem barulho."
+		mg_btn.text = "RODAR"
+	mg_ui.visible = true
+
+
+func update_minigame(dt: float) -> void:
+	if mg.is_empty():
+		return
+	mg["pos"] = float(mg["pos"]) + float(mg["dir"]) * float(mg["speed"]) * dt
+	if mg["pos"] > 1.0:
+		mg["pos"] = 1.0
+		mg["dir"] = -1.0
+	elif mg["pos"] < 0.0:
+		mg["pos"] = 0.0
+		mg["dir"] = 1.0
+	mg["flash"] = maxf(0.0, float(mg["flash"]) - dt * 2.5)
+	mg["fail"] = maxf(0.0, float(mg["fail"]) - dt * 2.5)
+	mg_bar.queue_redraw()
+
+
+func _draw_minigame() -> void:
+	if mg.is_empty():
+		return
+	var s = mg_bar.size
+	var r = Rect2(Vector2(0, 26), Vector2(s.x, 34))
+	mg_bar.draw_rect(r, Color(0.12, 0.13, 0.16))
+	var zc: float = mg["zc"]
+	var zw: float = mg["zw"]
+	mg_bar.draw_rect(Rect2(Vector2(r.position.x + (zc - zw / 2.0) * s.x, r.position.y), Vector2(zw * s.x, r.size.y)), Color(0.24, 0.77, 0.54, 0.85))
+	mg_bar.draw_rect(r, Color(1, 1, 1, 0.15), false, 2.0)
+	var x = float(mg["pos"]) * s.x
+	mg_bar.draw_rect(Rect2(Vector2(x - 3, 14), Vector2(6, 58)), Color.WHITE)
+	if float(mg["flash"]) > 0.0:
+		mg_bar.draw_rect(r.grow(4), Color(0.24, 0.77, 0.54, float(mg["flash"])), false, 4.0)
+	if float(mg["fail"]) > 0.0:
+		mg_bar.draw_rect(r.grow(4), Color(0.88, 0.28, 0.24, float(mg["fail"])), false, 4.0)
+	var font = get_font()
+	for i in int(mg["rounds"]):
+		var c = Vector2(s.x / 2.0 + (i - (int(mg["rounds"]) - 1) / 2.0) * 34.0, 80)
+		mg_bar.draw_circle(c, 8.0, OK_C if i < int(mg["round"]) else Color(0.3, 0.32, 0.36))
+	mg_bar.draw_string(font, Vector2(0, 16), "%d / %d" % [mg["round"], mg["rounds"]], HORIZONTAL_ALIGNMENT_RIGHT, s.x, 16, DIM)
+
+
+func _minigame_press() -> void:
+	if mg.is_empty():
+		return
+	var ok = absf(float(mg["pos"]) - float(mg["zc"])) <= float(mg["zw"]) / 2.0
+	var ref: String = mg["ref"]
+	if ok:
+		mg["round"] = int(mg["round"]) + 1
+		mg["flash"] = 1.0
+		if int(mg["round"]) >= int(mg["rounds"]):
+			var kind = mg["kind"]
+			close_minigame()
+			if kind == "alarm":
+				Z["alarm_off"][ref] = true
+				set_alarm_led(ref, OK_C)
+				toast("Alarme desligado", OK_C)
+				feed_add("Alarme desligado: " + D.HEISTS[ref]["name"], OK_C)
+			else:
+				finish_rear(ref)
+			return
+		mg["zw"] = maxf(0.08, float(mg["zw"]) * 0.75)
+		mg["speed"] = float(mg["speed"]) * 1.25
+		mg["zc"] = randf_range(0.15, 0.85)
+	else:
+		mg["fail"] = 1.0
+		if mg["kind"] == "alarm":
+			close_minigame()
+			Z["alarm_trip"][ref] = true
+			set_alarm_led(ref, RED)
+			wanted = maxi(wanted, 1)
+			lost_t = 0.0
+			toast("Cortaste o fio errado — alarme disparado!", RED)
+			feed_add("Alarme disparado: " + D.HEISTS[ref]["name"], RED)
+		else:
+			mg["round"] = maxi(0, int(mg["round"]) - 1)
+			mg["zc"] = randf_range(0.15, 0.85)
+
+
+func close_minigame() -> void:
+	mg = {}
+	mg_ui.visible = false
+	if mode == "mini":
+		mode = "play"
+	last_act = "?"
+
+
+# =====================================================================
 #  INTERIORES: mobília, funcionário, câmaras, porta dos fundos, cofres
 # =====================================================================
 func heist_locked(id: String) -> String:
@@ -1947,7 +2409,7 @@ func cont_height(kind: String) -> float:
 	return hs.get(kind, 1.2)
 
 
-func enter_interior(poi: Dictionary) -> void:
+func enter_interior(poi: Dictionary, rear = false) -> void:
 	var id: String = poi["id"]
 	var h = D.HEISTS[id]
 	var lock = heist_locked(id)
@@ -1961,7 +2423,8 @@ func enter_interior(poi: Dictionary) -> void:
 	var bdx: float = def["bdoor"]
 	I = {"id": id, "w": w, "d": d, "blocks": [], "conts": [], "cams": [], "raid": 0.0, "searched": 0, "door": poi, "def": def,
 		"clerk": {"x": def["clerk"][0], "y": def["clerk"][1], "state": "calmo", "t": 8.0, "mesh": null},
-		"bdoor": {"x": bdx, "y": back, "open": false, "mesh": null, "block": {}}, "warned_cam": false}
+		"bdoor": {"x": bdx, "y": back, "open": false, "mesh": null, "block": {}}, "warned_cam": false,
+		"rear": rear, "has_rear": h.get("rear", true), "alarm_on": h.get("alarm", false) and not alarm_off(id)}
 	var th = 0.3
 	I["blocks"].append({"x": -th, "y": -th, "w": w + th * 2, "h": th, "hgt": 3.4, "wall": "n"})
 	I["blocks"].append({"x": -th, "y": 0.0, "w": th, "h": d, "hgt": 3.4, "wall": "w"})
@@ -2005,8 +2468,15 @@ func enter_interior(poi: Dictionary) -> void:
 	P["in_car"] = false
 	P["ang"] = -PI / 2
 	cam_yaw = 0.0
+	if rear:
+		P["x"] = bdx
+		P["y"] = 1.2
+		P["ang"] = PI / 2
+		cam_yaw = PI
 	snap_cam = true
-	feed_add("Entraste: " + h["name"])
+	feed_add("Entraste: " + h["name"] + (" (traseiras)" if rear else ""))
+	if Z["alarm_trip"].has(id):
+		trigger_alarm()
 	last_act = "?"
 
 
@@ -2160,6 +2630,12 @@ func build_interior() -> void:
 	I["blocks"].append({"x": ck["x"] - 0.35, "y": ck["y"] - 0.35, "w": 0.7, "h": 0.7, "hgt": 1.9, "deco": true})
 	var exm = make_ring(Vector3(w / 2.0, 0.05, d + 0.6), 0.9, 1.2, OK_C)
 	exm.reparent(world_int)
+	if I["has_rear"]:
+		var rx: float = def["bdoor"]
+		box(Vector3(1.4, 2.2, 0.08), mat("#3c4148", 0.35, 0.6), Vector3(rx, 1.1, 0.02), world_int, false)
+		box(Vector3(0.5, 0.18, 0.05), unshaded(OK_C), Vector3(rx, 2.45, 0.04), world_int, false)
+		var rring = make_ring(Vector3(rx, 0.05, 0.7), 0.5, 0.7, OK_C)
+		rring.reparent(world_int)
 
 
 func model_inst_at(path: String, scale_v: Vector3, rot_y: float, parent: Node3D, pos: Vector3) -> Node3D:
@@ -2261,6 +2737,9 @@ func start_search(c: Dictionary) -> void:
 	search = {"kind": "cont", "c": c, "t": 0.0, "need": float(c["time"]) * 0.6, "label": ("A PERFURAR: " if c["kind"] == "cofre" else "A VASCULHAR: ") + str(c["n"]).to_upper()}
 	if c["kind"] == "cofre":
 		make_noise()
+	if c["kind"] in ["cofre", "vitrine", "quadros"] and I.get("alarm_on", false):
+		toast("Sensor de alarme ativado!", RED)
+		trigger_alarm()
 
 
 func start_door() -> void:
@@ -2281,6 +2760,7 @@ func make_noise() -> void:
 	var ck = I["clerk"]
 	if ck["state"] == "calmo":
 		ck["t"] = minf(ck["t"], 1.5)
+		ck["alert"] = true
 
 
 func threaten_clerk() -> void:
@@ -2354,7 +2834,7 @@ func roll_loot(table: Array) -> Array:
 	return out
 
 
-func exit_interior() -> void:
+func exit_interior(rear = false) -> void:
 	var h = D.HEISTS[I["id"]]
 	var door = I["door"]
 	var searched = int(I["searched"])
@@ -2375,6 +2855,12 @@ func exit_interior() -> void:
 	P["y"] = door["y"] + 1.6
 	P["ang"] = PI / 2
 	cam_yaw = 0.0
+	var rp = find_poi("r_" + hid)
+	if rear and not rp.is_empty():
+		P["x"] = rp["x"]
+		P["y"] = rp["y"] - 1.4
+		P["ang"] = -PI / 2
+		Z["rear_open"][hid] = true
 	snap_cam = true
 	if searched > 0:
 		S["cds"][hid] = now_ms() + float(h["cd"]) * 1000.0
@@ -2460,7 +2946,7 @@ func update_interior(dt: float) -> void:
 			toast("Interrompido", RED)
 	# funcionário
 	var ck = I["clerk"]
-	if ck["state"] == "calmo":
+	if ck["state"] == "calmo" and (P["y"] > float(I["def"]["back"]) or ck.get("alert", false)):
 		ck["t"] = ck["t"] - dt
 		if ck["t"] <= 0:
 			ck["state"] = "ligou"
@@ -2501,6 +2987,9 @@ func update_interior(dt: float) -> void:
 	if P["y"] > float(I["d"]) + 0.5:
 		exit_interior()
 		return
+	if I["has_rear"] and P["y"] < 0.8 and absf(P["x"] - float(I["def"]["bdoor"])) < 0.9:
+		exit_interior(true)
+		return
 	update_act_button()
 
 
@@ -2515,6 +3004,8 @@ func interior_action() -> Dictionary:
 		return {"l": "AMARRAR", "f": tie_clerk}
 	var bd = I["bdoor"]
 	if not bd["open"] and Vector2(P["x"] - bd["x"], P["y"] - bd["y"]).length() < 2.0:
+		if P["y"] < bd["y"]:
+			return {"l": "ABRIR", "f": func(): search = {"kind": "door", "t": 0.0, "need": 0.4, "label": "A ABRIR"}}
 		return {"l": "ARROMBAR", "f": start_door}
 	var c = near_cont()
 	if not c.is_empty():
@@ -2834,6 +3325,8 @@ func ctx_action() -> Dictionary:
 				return {"l": "VENDER", "f": func(): open_sell(v)}
 		var p = near_poi(4.3)
 		if not p.is_empty():
+			if p["kind"] in ["rear", "alarm"]:
+				return outdoor_action(p)
 			if p["kind"] == "heist":
 				var lock = heist_locked(p["id"])
 				if lock != "":
@@ -2864,7 +3357,7 @@ func do_action() -> void:
 
 func exit_car() -> void:
 	P["in_car"] = false
-	car["spd"] = 0.0
+	set_car_speed_scale(0.0)
 	P["x"] = car["x"] + cos(car["ang"] + PI / 2) * 2.2
 	P["y"] = car["y"] + sin(car["ang"] + PI / 2) * 2.2
 	push_out(P, 0.45)
@@ -2927,6 +3420,8 @@ func shoot() -> void:
 	for i in int(w["pel"]):
 		fire_bullet(P["x"] + cos(a), P["y"] + sin(a), a + randf_range(-w["spr"], w["spr"]), "p", w["dmg"], w["range"] / 52.0)
 	P["fire_cd"] = w["rate"]
+	if not inside:
+		panic_t = 10.0
 	for i in 3:
 		add_part(P["x"] + cos(a) * 1.1, P["y"] + sin(a) * 1.1, 1.3, cos(a) * randf_range(4, 10), sin(a) * randf_range(4, 10), 0.12, Color("#ffd56a"))
 	if not inside and wanted == 0 and gang.is_empty():
@@ -3001,6 +3496,8 @@ func _process(delta: float) -> void:
 		S["pending"] = float(S["pending"]) + rate * dt / 60.0
 	if mode == "loot":
 		update_reveal(dt)
+	if mode == "mini":
+		update_minigame(dt)
 	if mode == "play":
 		if inside:
 			update_interior(dt)
@@ -3024,7 +3521,7 @@ func update_game(dt: float) -> void:
 	P["px"] = P["x"]
 	P["py"] = P["y"]
 	if P["in_car"]:
-		drive(car, iv, dt, cd["spd"])
+		drive_player(car, iv, dt, cd)
 		P["x"] = car["x"]
 		P["y"] = car["y"]
 		P["ang"] = car["ang"]
@@ -3049,6 +3546,18 @@ func update_game(dt: float) -> void:
 		shoot()
 	update_life(dt)
 	update_vans(dt)
+	if panic_t > 0.0:
+		panic_t -= dt
+	if not search.is_empty() and search["kind"] == "rear":
+		var rp = find_poi("r_" + search["ref"])
+		if not P["in_car"] and not rp.is_empty() and dist(P, rp) < 3.0:
+			search["t"] = search["t"] + dt
+			if search["t"] >= search["need"]:
+				var rref = search["ref"]
+				search = {}
+				finish_rear(rref)
+		else:
+			search = {}
 	if not search.is_empty() and search["kind"] == "table":
 		var sv = search["van"]
 		if not P["in_car"] and Vector2(P["x"] - sv["tx"], P["y"] - sv["ty"]).length() < 3.0:
@@ -3112,7 +3621,7 @@ func update_game(dt: float) -> void:
 					hurt_player(4.0 + rel * 0.4)
 					p["hp"] = p["hp"] - (6.0 + absf(car["spd"]) * 1.1)
 					p["hit_cd"] = 0.5
-					car["spd"] = car["spd"] * 0.5
+					set_car_speed_scale(0.5)
 					boom((p["x"] + car["x"]) / 2.0, (p["y"] + car["y"]) / 2.0, Color("#ffd56a"), 6)
 			elif absf(p["spd"]) < 11.0:
 				near = true
@@ -3310,8 +3819,7 @@ func render(dt: float) -> void:
 			cm = make_car(cd["col"], false, cd.get("model", ""))
 			add_child(cm)
 			car["mesh"] = cm
-		cm.position = Vector3(car["x"], 0, car["y"])
-		cm.rotation.y = -car["ang"]
+		car_visual(cm, car, dt)
 		var dead = float(S["car_hp"]) <= 0
 		if cm.get_meta("dead", false) != dead:
 			cm.set_meta("dead", dead)
@@ -3393,9 +3901,11 @@ func render(dt: float) -> void:
 	var dd = 6.2
 	var look_h = 1.6
 	if P["in_car"]:
-		hgt = 4.6
-		dd = 9.5
+		var sp = absf(float(car.get("spd", 0.0)))
+		hgt = 4.4 + sp * 0.03
+		dd = 8.8 + sp * 0.12
 		look_h = 1.3
+	cam.fov = lerpf(cam.fov, 60.0 + (minf(absf(float(car.get("spd", 0.0))), 30.0) * 0.4 if P["in_car"] and not inside else 0.0), 1.0 - exp(-dt * 3.0))
 	if inside:
 		hgt = 6.5
 		dd = 5.5
@@ -3416,6 +3926,9 @@ func render(dt: float) -> void:
 		cam_p = cam_p.lerp(want, 1.0 - exp(-dt * 12.0))
 	cam.position = cam_p
 	cam.look_at(focus, Vector3.UP)
+	if cam_shake > 0.0:
+		cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * cam_shake * 0.35
+		cam_shake = maxf(0.0, cam_shake - dt * 2.5)
 	if cam_dbg != Vector3.ZERO:
 		cam.position = Vector3(P["x"], 0, P["y"]) + cam_dbg
 		cam.look_at(Vector3(P["x"], 1.25, P["y"]), Vector3.UP)
@@ -3642,6 +4155,12 @@ func setup_ui() -> void:
 	place(lbl_zone, 0.5, 0, -250, 96, 500, 22)
 	lbl_zone.visible = false
 	hud.add_child(lbl_zone)
+	lbl_speed = lbl("", 46, Color.WHITE)
+	lbl_speed.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	lbl_speed.add_theme_constant_override("shadow_offset_x", 2)
+	lbl_speed.add_theme_constant_override("shadow_offset_y", 2)
+	place(lbl_speed, 0, 1, 28, -96, 260, 70)
+	hud.add_child(lbl_speed)
 	prog_box = PanelContainer.new()
 	prog_box.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.85)))
 	prog_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3693,6 +4212,7 @@ func setup_ui() -> void:
 	build_region_ui(th)
 	build_fullmap_ui(th)
 	build_loot_ui(th)
+	build_minigame_ui(th)
 	build_modal_ui(th)
 	build_login_ui(th)
 	travel_ui = ColorRect.new()
@@ -3985,6 +4505,9 @@ func update_hud() -> void:
 	bar_xp.value = 100.0 * float(S["xp"]) / xp_need(int(S["lvl"]))
 	bar_hp.value = float(S["hp"])
 	bar_car.value = 100.0 * float(S["car_hp"]) / float(car_def()["hp"])
+	lbl_speed.visible = P["in_car"] and not inside and mode == "play"
+	if lbl_speed.visible:
+		lbl_speed.text = "%d km/h" % int(absf(float(car.get("spd", 0.0))) * 3.6)
 	var bd0 = bag_dims()
 	lbl_bag.text = "Mochila %d / %d" % [cells_used(S["inv"]), bd0.x * bd0.y]
 	var st = (prog_bar.get_theme_stylebox("fill") as StyleBoxFlat)
@@ -4160,6 +4683,8 @@ func _draw_minimap() -> void:
 		var view = Rect2(pp - center / s, sz / s)
 		_map_draw_world(minimap, to_scr, s, view)
 		for p in Z["pois"]:
+		if p["kind"] in ["rear", "alarm"]:
+			continue
 			var sp = to_scr.call(Vector2(p["x"], p["y"]))
 			if Rect2(Vector2(-10, -10), sz + Vector2(20, 20)).has_point(sp):
 				_draw_icon(minimap, sp, p["id"], 8.0)
@@ -4185,6 +4710,8 @@ func open_fullmap() -> void:
 	for c in fullmap_area.get_children():
 		c.queue_free()
 	for p in Z["pois"]:
+		if p["kind"] in ["rear", "alarm"]:
+			continue
 		var b = Button.new()
 		b.flat = true
 		b.anchor_left = p["x"] / float(Z["w"])
@@ -4234,6 +4761,8 @@ func _draw_fullmap() -> void:
 		for d in D.DISTRICTS:
 			fullmap_area.draw_string(font, Vector2(d["x"], d["y"]) * s + Vector2(-150, 0), d["name"], HORIZONTAL_ALIGNMENT_CENTER, 300, 20, Color(1, 1, 1, 0.35))
 	for p in Z["pois"]:
+		if p["kind"] in ["rear", "alarm"]:
+			continue
 		var sp = to_scr.call(Vector2(p["x"], p["y"]))
 		_draw_icon(fullmap_area, sp, p["id"], 13.0)
 		var sub = p["name"]
