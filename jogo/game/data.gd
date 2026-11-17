@@ -17,10 +17,10 @@ const CARS := [
 ]
 
 const BAGS := [
-	{"id": "b10", "name": "Mochila", "price": 0, "cap": 10, "lvl": 1},
-	{"id": "b20", "name": "Saco desportivo", "price": 12000, "cap": 20, "lvl": 1},
-	{"id": "b35", "name": "Mala de viagem", "price": 50000, "cap": 35, "lvl": 3},
-	{"id": "b60", "name": "Saco de lona XL", "price": 150000, "cap": 60, "lvl": 5, "story": 2},
+	{"id": "b10", "name": "Mochila escolar", "price": 0, "cap": 10, "lvl": 1, "g": [5, 3]},
+	{"id": "b20", "name": "Mochila desportiva", "price": 12000, "cap": 20, "lvl": 1, "g": [6, 4]},
+	{"id": "b35", "name": "Mochila tática", "price": 50000, "cap": 35, "lvl": 3, "g": [7, 5]},
+	{"id": "b60", "name": "Mochila de expedição", "price": 150000, "cap": 60, "lvl": 5, "story": 2, "g": [8, 6]},
 ]
 
 ## ferramentas e equipamento (Armeiro)
@@ -42,36 +42,36 @@ const PROPS := [
 
 ## catálogo de itens: nome, categoria, peso (kg), valor. O ícone é res://game/icons/<id>.png
 const ITEMS := {
-	"cash": {"n": "Dinheiro", "cat": "dinheiro", "kg": 0.0, "v": 0},
-	"relogio": {"n": "Relógio de ouro", "cat": "joias", "kg": 0.2, "v": 6000},
-	"anel": {"n": "Anel de diamante", "cat": "joias", "kg": 0.05, "v": 12000},
-	"colar": {"n": "Colar de pérolas", "cat": "joias", "kg": 0.1, "v": 8000},
-	"brincos": {"n": "Brincos de safira", "cat": "joias", "kg": 0.05, "v": 5000},
-	"lingote": {"n": "Lingote de ouro", "cat": "joias", "kg": 1.0, "v": 25000},
-	"mala": {"n": "Mala de marca", "cat": "joias", "kg": 1.5, "v": 7000},
-	"portatil": {"n": "Portátil", "cat": "eletronica", "kg": 2.0, "v": 4500},
-	"telemovel": {"n": "Telemóvel", "cat": "eletronica", "kg": 0.3, "v": 1200},
-	"tablet": {"n": "Tablet", "cat": "eletronica", "kg": 0.6, "v": 2000},
-	"maquina_cafe": {"n": "Máquina de café", "cat": "eletronica", "kg": 6.0, "v": 2000},
-	"whisky": {"n": "Whisky velho", "cat": "bebidas", "kg": 1.2, "v": 1800},
-	"vinho": {"n": "Vinho do Porto vintage", "cat": "bebidas", "kg": 1.4, "v": 2500},
-	"champanhe": {"n": "Champanhe", "cat": "bebidas", "kg": 1.5, "v": 1500},
-	"licor": {"n": "Garrafa de licor", "cat": "bebidas", "kg": 1.0, "v": 400},
-	"energeticas": {"n": "Bebida energética", "cat": "bebidas", "kg": 0.5, "v": 120},
-	"tabaco": {"n": "Volume de tabaco", "cat": "diversos", "kg": 0.5, "v": 350},
-	"raspadinhas": {"n": "Raspadinhas", "cat": "diversos", "kg": 0.1, "v": 200},
-	"bolo": {"n": "Bolo de aniversário", "cat": "diversos", "kg": 1.0, "v": 150},
-	"bateria": {"n": "Bateria de carro", "cat": "diversos", "kg": 8.0, "v": 1200},
-	"ferramentas": {"n": "Caixa de ferramentas", "cat": "diversos", "kg": 4.0, "v": 1500},
-	"medicamentos": {"n": "Caixa de medicamentos", "cat": "farmacia", "kg": 0.4, "v": 900},
-	"analgesicos": {"n": "Analgésicos fortes", "cat": "farmacia", "kg": 0.2, "v": 1600},
-	"kit_medico": {"n": "Kit médico", "cat": "farmacia", "kg": 1.0, "v": 2500, "use": "heal"},
-	"pintura": {"n": "Pintura antiga", "cat": "arte", "kg": 4.0, "v": 60000},
-	"estatueta": {"n": "Estatueta de bronze", "cat": "arte", "kg": 7.0, "v": 35000},
-	"vaso": {"n": "Vaso cerâmico", "cat": "arte", "kg": 5.0, "v": 25000},
-	"moeda": {"n": "Moeda rara", "cat": "arte", "kg": 0.1, "v": 15000},
-	"foto": {"n": "Fotografia antiga", "cat": "historia", "kg": 0.0, "v": 0},
-	"livro": {"n": "Livro de contas", "cat": "historia", "kg": 0.0, "v": 0},
+	"cash": {"n": "Dinheiro", "cat": "dinheiro", "kg": 0.0, "v": 0, "sz": [1, 1], "max": 25000},
+	"relogio": {"n": "Relógio de ouro", "cat": "joias", "kg": 0.2, "v": 6000, "sz": [1, 1], "max": 3},
+	"anel": {"n": "Anel de diamante", "cat": "joias", "kg": 0.05, "v": 12000, "sz": [1, 1], "max": 5},
+	"colar": {"n": "Colar de pérolas", "cat": "joias", "kg": 0.1, "v": 8000, "sz": [1, 1], "max": 2},
+	"brincos": {"n": "Brincos de safira", "cat": "joias", "kg": 0.05, "v": 5000, "sz": [1, 1], "max": 5},
+	"lingote": {"n": "Lingote de ouro", "cat": "joias", "kg": 1.0, "v": 25000, "sz": [2, 1], "max": 1},
+	"mala": {"n": "Mala de marca", "cat": "joias", "kg": 1.5, "v": 7000, "sz": [2, 2], "max": 1},
+	"portatil": {"n": "Portátil", "cat": "eletronica", "kg": 2.0, "v": 4500, "sz": [2, 2], "max": 1},
+	"telemovel": {"n": "Telemóvel", "cat": "eletronica", "kg": 0.3, "v": 1200, "sz": [1, 1], "max": 3},
+	"tablet": {"n": "Tablet", "cat": "eletronica", "kg": 0.6, "v": 2000, "sz": [1, 2], "max": 1},
+	"maquina_cafe": {"n": "Máquina de café", "cat": "eletronica", "kg": 6.0, "v": 2000, "sz": [2, 2], "max": 1},
+	"whisky": {"n": "Whisky velho", "cat": "bebidas", "kg": 1.2, "v": 1800, "sz": [1, 2], "max": 1},
+	"vinho": {"n": "Vinho do Porto vintage", "cat": "bebidas", "kg": 1.4, "v": 2500, "sz": [1, 2], "max": 1},
+	"champanhe": {"n": "Champanhe", "cat": "bebidas", "kg": 1.5, "v": 1500, "sz": [1, 2], "max": 1},
+	"licor": {"n": "Garrafa de licor", "cat": "bebidas", "kg": 1.0, "v": 400, "sz": [1, 2], "max": 1},
+	"energeticas": {"n": "Bebida energética", "cat": "bebidas", "kg": 0.5, "v": 120, "sz": [1, 1], "max": 6},
+	"tabaco": {"n": "Volume de tabaco", "cat": "diversos", "kg": 0.5, "v": 350, "sz": [1, 1], "max": 5},
+	"raspadinhas": {"n": "Raspadinhas", "cat": "diversos", "kg": 0.1, "v": 200, "sz": [1, 1], "max": 10},
+	"bolo": {"n": "Bolo de aniversário", "cat": "diversos", "kg": 1.0, "v": 150, "sz": [2, 1], "max": 1},
+	"bateria": {"n": "Bateria de carro", "cat": "diversos", "kg": 8.0, "v": 1200, "sz": [2, 2], "max": 1},
+	"ferramentas": {"n": "Caixa de ferramentas", "cat": "diversos", "kg": 4.0, "v": 1500, "sz": [2, 1], "max": 1},
+	"medicamentos": {"n": "Caixa de medicamentos", "cat": "farmacia", "kg": 0.4, "v": 900, "sz": [1, 1], "max": 4},
+	"analgesicos": {"n": "Analgésicos fortes", "cat": "farmacia", "kg": 0.2, "v": 1600, "sz": [1, 1], "max": 5},
+	"kit_medico": {"n": "Kit médico", "cat": "farmacia", "kg": 1.0, "v": 2500, "use": "heal", "sz": [2, 1], "max": 1},
+	"pintura": {"n": "Pintura antiga", "cat": "arte", "kg": 4.0, "v": 60000, "sz": [2, 3], "max": 1},
+	"estatueta": {"n": "Estatueta de bronze", "cat": "arte", "kg": 7.0, "v": 35000, "sz": [2, 2], "max": 1},
+	"vaso": {"n": "Vaso cerâmico", "cat": "arte", "kg": 5.0, "v": 25000, "sz": [2, 2], "max": 1},
+	"moeda": {"n": "Moeda rara", "cat": "arte", "kg": 0.1, "v": 15000, "sz": [1, 1], "max": 5},
+	"foto": {"n": "Fotografia antiga", "cat": "historia", "kg": 0.0, "v": 0, "sz": [1, 1], "max": 1},
+	"livro": {"n": "Livro de contas", "cat": "historia", "kg": 0.0, "v": 0, "sz": [1, 1], "max": 1},
 }
 
 const CAT_NAMES := {"joias": "Joias", "eletronica": "Eletrónica", "bebidas": "Bebidas", "arte": "Arte", "farmacia": "Farmácia", "diversos": "Diversos"}
@@ -142,7 +142,7 @@ const VAN_TYPES := [
 ## história do Zé Faísca (Bar O Farol)
 const STORY := [
 	{"t": "A fotografia", "txt": "«Há uma fotografia antiga no cofre dos hóspedes do Hotel Atlântida. Traz-ma.»", "item": "foto", "pay": 0, "cash": 50000, "reward": "Joalharia Aurora + kit de gazuas"},
-	{"t": "A dívida", "txt": "«A foto confirmou tudo. Quem sabe o resto quer um milhão. Paga e abrimos o banco.»", "item": "", "pay": 1000000, "cash": 0, "reward": "Banco de Vila Rubra + Saco de lona XL"},
+	{"t": "A dívida", "txt": "«A foto confirmou tudo. Quem sabe o resto quer um milhão. Paga e abrimos o banco.»", "item": "", "pay": 1000000, "cash": 0, "reward": "Banco de Vila Rubra + Mochila de expedição"},
 	{"t": "O livro de contas", "txt": "«O cofre principal do banco guarda um livro de contas. Com ele, Vila Rubra é nossa.»", "item": "livro", "pay": 0, "cash": 250000, "reward": "Contratos de elite (a dobrar)"},
 ]
 

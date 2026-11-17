@@ -113,7 +113,9 @@ var anims_logged = false
 var ui_font: Font
 var icon_cache = {}
 var loot_mode = "loot"
-var inv_sel = -1
+var inv_sel = null
+var paneL = {}
+var paneR = {}
 var sell_van = {}
 var loot_btn: Button
 var bag_title: Label
@@ -225,12 +227,15 @@ func shots() -> void:
 			await shot("11_cafe_balcao")
 			threaten_clerk()
 			var c = I["conts"][0]
+			c["loot"] = [{"cash": [12000, 18000]}, {"id": "relogio", "ch": 1.0, "q": [2, 2]}, {"id": "portatil", "ch": 1.0, "q": [1, 1]}, {"id": "whisky", "ch": 1.0, "q": [1, 1]}, {"id": "anel", "ch": 1.0, "q": [1, 1]}]
 			start_search(c)
 			await tr.create_timer(0.5).timeout
 			await shot("12_a_vasculhar")
 			if not search.is_empty():
 				search["t"] = 999.0
 			await tr.create_timer(0.3).timeout
+			await shot("13a_a_revelar")
+			await tr.create_timer(3.0).timeout
 			await shot("13_janela_saque")
 			_loot_take_all()
 			close_loot()
@@ -239,7 +244,8 @@ func shots() -> void:
 			add_stack({"id": "whisky", "q": 3})
 			add_stack({"id": "kit_medico", "q": 1})
 			open_inventory()
-			_inv_select(1)
+			inv_sel = S["inv"][1] if S["inv"].size() > 1 else null
+			refresh_loot()
 			await shot("14_inventario")
 			close_loot()
 			start_door()
@@ -2248,7 +2254,7 @@ func near_cont() -> Dictionary:
 
 
 func start_search(c: Dictionary) -> void:
-	search = {"kind": "cont", "c": c, "t": 0.0, "need": float(c["time"]), "label": ("A PERFURAR: " if c["kind"] == "cofre" else "A VASCULHAR: ") + str(c["n"]).to_upper()}
+	search = {"kind": "cont", "c": c, "t": 0.0, "need": float(c["time"]) * 0.6, "label": ("A PERFURAR: " if c["kind"] == "cofre" else "A VASCULHAR: ") + str(c["n"]).to_upper()}
 	if c["kind"] == "cofre":
 		make_noise()
 
@@ -2317,7 +2323,13 @@ func finish_search() -> void:
 		return
 	var c = search["c"]
 	c["searched"] = true
-	c["items"] = roll_loot(c["loot"])
+	c["items"] = []
+	var cd = cont_dims(c)
+	for st in roll_loot(c["loot"]):
+		grid_add(c["items"], cd.x, cd.y, st)
+	for it in c["items"]:
+		it["hid"] = true
+		it["rev"] = 0.0
 	I["searched"] = int(I["searched"]) + 1
 	search = {}
 	open_loot(c)
@@ -2593,7 +2605,7 @@ func van_price(st: Dictionary, v: Dictionary) -> int:
 	if st["id"] == "cash" or it["cat"] == "historia":
 		return 0
 	var mult = 1.3 if it["cat"] == v["type"]["cat"] else 0.9
-	return int(round(float(it["v"]) * int(st["q"]) * mult * terr_bonus() / 10.0)) * 10
+	return int(round(float(it["v"]) * int(st.get("q", 1)) * mult * terr_bonus() / 10.0)) * 10
 
 
 func van_sold(v: Dictionary, amount: int) -> void:
@@ -2983,6 +2995,8 @@ func _process(delta: float) -> void:
 	var rate = income_rate()
 	if rate > 0 and not S.is_empty():
 		S["pending"] = float(S["pending"]) + rate * dt / 60.0
+	if mode == "loot":
+		update_reveal(dt)
 	if mode == "play":
 		if inside:
 			update_interior(dt)
@@ -3967,7 +3981,8 @@ func update_hud() -> void:
 	bar_xp.value = 100.0 * float(S["xp"]) / xp_need(int(S["lvl"]))
 	bar_hp.value = float(S["hp"])
 	bar_car.value = 100.0 * float(S["car_hp"]) / float(car_def()["hp"])
-	lbl_bag.text = "Saco %.1f / %d kg" % [inv_kg(), bag_def()["cap"]]
+	var bd0 = bag_dims()
+	lbl_bag.text = "Mochila %d / %d" % [cells_used(S["inv"]), bd0.x * bd0.y]
 	var st = (prog_bar.get_theme_stylebox("fill") as StyleBoxFlat)
 	if not search.is_empty():
 		prog_box.visible = true
@@ -4313,29 +4328,138 @@ func _draw_region() -> void:
 
 
 # =====================================================================
-#  ITENS E DINHEIRO (o dinheiro é um item no saco)
+#  ITENS E DINHEIRO — inventário em grelha (cada item ocupa w×h casas)
 # =====================================================================
+const GridView = preload("res://game/grid.gd")
+const CASH_MAX = 25000
+
+
 func item_def(id: String) -> Dictionary:
-	return D.ITEMS.get(id, {"n": id, "cat": "diversos", "kg": 0.0, "v": 0})
+	return D.ITEMS.get(id, {"n": id, "cat": "diversos", "kg": 0.0, "v": 0, "sz": [1, 1], "max": 1})
 
 
-func stack_kg(st: Dictionary) -> float:
-	if st["id"] == "cash":
-		return float(st["v"]) / 100000.0
-	return float(item_def(st["id"])["kg"]) * int(st["q"])
+func item_size(id: String) -> Vector2i:
+	var sz = item_def(id).get("sz", [1, 1])
+	return Vector2i(int(sz[0]), int(sz[1]))
+
+
+func item_max(id: String) -> int:
+	return int(item_def(id).get("max", 1))
 
 
 func stack_value(st: Dictionary) -> int:
 	if st["id"] == "cash":
 		return int(st["v"])
-	return int(item_def(st["id"])["v"]) * int(st["q"])
+	return int(item_def(st["id"])["v"]) * int(st.get("q", 1))
 
 
-func inv_kg() -> float:
-	var s = 0.0
-	for st in S["inv"]:
-		s += stack_kg(st)
-	return s
+func item_tier(st: Dictionary) -> int:
+	if item_def(st["id"])["cat"] == "historia":
+		return 4
+	var v = stack_value(st) if st["id"] == "cash" else int(item_def(st["id"])["v"])
+	if v < 1000:
+		return 0
+	if v < 3000:
+		return 1
+	if v < 8000:
+		return 2
+	if v < 20000:
+		return 3
+	return 4
+
+
+func bag_dims() -> Vector2i:
+	var g = bag_def().get("g", [5, 3])
+	return Vector2i(int(g[0]), int(g[1]))
+
+
+func cells_used(items: Array) -> int:
+	var n = 0
+	for it in items:
+		var sz = item_size(it["id"])
+		n += sz.x * sz.y
+	return n
+
+
+func grid_fits(items: Array, cols: int, rows: int, x: int, y: int, sz: Vector2i, ignore = null) -> bool:
+	if x < 0 or y < 0 or x + sz.x > cols or y + sz.y > rows:
+		return false
+	for it in items:
+		if it == ignore:
+			continue
+		var s2 = item_size(it["id"])
+		if x < int(it["x"]) + s2.x and x + sz.x > int(it["x"]) and y < int(it["y"]) + s2.y and y + sz.y > int(it["y"]):
+			return false
+	return true
+
+
+func grid_spot(items: Array, cols: int, rows: int, sz: Vector2i) -> Vector2i:
+	for y in rows:
+		for x in cols:
+			if grid_fits(items, cols, rows, x, y, sz):
+				return Vector2i(x, y)
+	return Vector2i(-1, -1)
+
+
+func grid_add(items: Array, cols: int, rows: int, st: Dictionary) -> int:
+	## mete um item (ou dinheiro) numa grelha; junta a pilhas existentes; devolve quanto entrou
+	var is_cash = st["id"] == "cash"
+	var left = int(st["v"]) if is_cash else int(st.get("q", 1))
+	var mx = CASH_MAX if is_cash else item_max(st["id"])
+	var key = "v" if is_cash else "q"
+	for it in items:
+		if left <= 0:
+			break
+		if it["id"] == st["id"] and not it.get("hid", false) and int(it.get(key, 1)) < mx:
+			var add = mini(left, mx - int(it.get(key, 1)))
+			it[key] = int(it.get(key, 1)) + add
+			left -= add
+	var sz = item_size(st["id"])
+	while left > 0:
+		var p = grid_spot(items, cols, rows, sz)
+		if p.x < 0:
+			break
+		var amt = mini(left, mx)
+		var ni = {"id": st["id"], "x": p.x, "y": p.y}
+		ni[key] = amt
+		items.append(ni)
+		left -= amt
+	return (int(st["v"]) if is_cash else int(st.get("q", 1))) - left
+
+
+func grid_pack(list: Array, cols: int, rows: int):
+	## volta a arrumar tudo numa grelha (maiores primeiro); null se não couber
+	var sorted = list.duplicate()
+	sorted.sort_custom(func(a, b): return item_size(a["id"]).x * item_size(a["id"]).y > item_size(b["id"]).x * item_size(b["id"]).y)
+	var out = []
+	for it in sorted:
+		var p = grid_spot(out, cols, rows, item_size(it["id"]))
+		if p.x < 0:
+			return null
+		var c = it.duplicate()
+		c["x"] = p.x
+		c["y"] = p.y
+		out.append(c)
+	return out
+
+
+func normalize_inv() -> void:
+	var d = bag_dims()
+	var ok = true
+	for it in S["inv"]:
+		if not it.has("x"):
+			ok = false
+	if ok:
+		return
+	var old = S["inv"]
+	S["inv"] = []
+	for it in old:
+		grid_add(S["inv"], d.x, d.y, it)
+
+
+func add_stack(st: Dictionary) -> int:
+	var d = bag_dims()
+	return grid_add(S["inv"], d.x, d.y, st)
 
 
 func inv_value() -> int:
@@ -4360,8 +4484,8 @@ func total_money() -> int:
 func count_item(id: String) -> int:
 	var n = 0
 	for st in S["inv"]:
-		if st["id"] == id and st.has("q"):
-			n += int(st["q"])
+		if st["id"] == id and st["id"] != "cash":
+			n += int(st.get("q", 1))
 	return n
 
 
@@ -4369,42 +4493,14 @@ func remove_item(id: String, q: int) -> void:
 	var keep = []
 	var left = q
 	for st in S["inv"]:
-		if st["id"] == id and st.has("q") and left > 0:
-			var take = mini(left, int(st["q"]))
-			st["q"] = int(st["q"]) - take
+		if st["id"] == id and st["id"] != "cash" and left > 0:
+			var take = mini(left, int(st.get("q", 1)))
+			st["q"] = int(st.get("q", 1)) - take
 			left -= take
 			if int(st["q"]) <= 0:
 				continue
 		keep.append(st)
 	S["inv"] = keep
-
-
-func add_stack(st: Dictionary) -> int:
-	## mete um item (ou dinheiro) no saco; devolve quantas unidades couberam
-	var cap = float(bag_def()["cap"])
-	if st["id"] == "cash":
-		var kg = float(st["v"]) / 100000.0
-		if inv_kg() + kg > cap + 0.001:
-			return 0
-		for s in S["inv"]:
-			if s["id"] == "cash":
-				s["v"] = int(s["v"]) + int(st["v"])
-				return int(st["v"])
-		S["inv"].insert(0, {"id": "cash", "v": int(st["v"])})
-		return int(st["v"])
-	var kg1 = float(item_def(st["id"])["kg"])
-	var room = cap - inv_kg()
-	var n = int(st["q"])
-	if kg1 > 0:
-		n = mini(n, int(floor((room + 0.0001) / kg1)))
-	if n <= 0:
-		return 0
-	for s in S["inv"]:
-		if s["id"] == st["id"]:
-			s["q"] = int(s["q"]) + n
-			return n
-	S["inv"].append({"id": st["id"], "q": n})
-	return n
 
 
 func take_cash(amount: int) -> void:
@@ -4422,7 +4518,7 @@ func take_cash(amount: int) -> void:
 
 
 func spend(amount: int) -> bool:
-	## paga primeiro com o dinheiro do saco e depois com o cofre
+	## paga primeiro com o dinheiro da mochila e depois com o cofre
 	if total_money() < amount:
 		return false
 	var from_bag = mini(bag_cash(), amount)
@@ -4439,144 +4535,84 @@ func icon_tex(id: String):
 
 
 # =====================================================================
-#  JANELA DE ITENS: saque, inventário e venda (grelha de ícones)
+#  JANELA DUPLA: contentor / mochila (arrastar, tocar, revelar)
 # =====================================================================
+func pane(title_size = 26) -> Dictionary:
+	var p = PanelContainer.new()
+	p.add_theme_stylebox_override("panel", panel_style())
+	var v = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	p.add_child(v)
+	var h = HBoxContainer.new()
+	var t1 = lbl("", title_size)
+	t1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(t1)
+	var info = lbl("", 20, GOLD)
+	h.add_child(info)
+	v.add_child(h)
+	var sub = lbl("", 15, DIM)
+	v.add_child(sub)
+	var holder = CenterContainer.new()
+	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(holder)
+	var g = GridView.new()
+	g.setup(self, 5, 4, 62.0)
+	g.tapped.connect(_grid_tapped)
+	g.dropped.connect(_grid_dropped)
+	holder.add_child(g)
+	var foot = HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 8)
+	v.add_child(foot)
+	return {"panel": p, "title": t1, "info": info, "sub": sub, "grid": g, "foot": foot}
+
+
 func build_loot_ui(th: Theme) -> void:
 	loot_ui = Control.new()
 	full(loot_ui)
 	loot_ui.theme = th
-	dark_bg(loot_ui, 0.6)
-	var cc = CenterContainer.new()
-	full(cc)
-	loot_ui.add_child(cc)
-	var outer = VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 8)
-	cc.add_child(outer)
+	dark_bg(loot_ui, 0.55)
 	var hb = HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 12)
-	outer.add_child(hb)
-	for side in 2:
-		var pane = PanelContainer.new()
-		pane.add_theme_stylebox_override("panel", panel_style())
-		pane.custom_minimum_size = Vector2(520, 470)
-		hb.add_child(pane)
-		var v = VBoxContainer.new()
-		v.add_theme_constant_override("separation", 8)
-		pane.add_child(v)
-		var h = HBoxContainer.new()
-		var title = lbl("", 20)
-		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		h.add_child(title)
-		var info = lbl("", 17, GOLD)
-		h.add_child(info)
-		v.add_child(h)
-		var sc = ScrollContainer.new()
-		sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		v.add_child(sc)
-		var grid = GridContainer.new()
-		grid.columns = 5
-		grid.add_theme_constant_override("h_separation", 6)
-		grid.add_theme_constant_override("v_separation", 6)
-		sc.add_child(grid)
-		var btn = ui_button("", _loot_left_btn if side == 0 else close_loot, "g" if side == 0 else "")
-		btn.custom_minimum_size = Vector2(0, 48)
-		v.add_child(btn)
-		if side == 0:
-			loot_title = title
-			loot_info = info
-			loot_grid = grid
-			loot_btn = btn
-		else:
-			bag_title = title
-			loot_bag_info = info
-			bag_grid = grid
-			btn.text = "FECHAR"
-	var strip = HBoxContainer.new()
-	strip.add_theme_constant_override("separation", 10)
-	strip.alignment = BoxContainer.ALIGNMENT_CENTER
-	outer.add_child(strip)
-	loot_detail = lbl("", 17, Color("#ecebe6"))
-	strip.add_child(loot_detail)
+	hb.add_theme_constant_override("separation", 14)
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hb.offset_left = 20
+	hb.offset_right = -20
+	hb.offset_top = 18
+	hb.offset_bottom = -18
+	loot_ui.add_child(hb)
+	paneL = pane()
+	paneR = pane()
+	for pn in [paneL, paneR]:
+		pn["panel"].custom_minimum_size = Vector2(590, 0)
+		hb.add_child(pn["panel"])
+	loot_btn = ui_button("", _loot_left_btn, "g")
+	loot_btn.custom_minimum_size = Vector2(200, 50)
+	paneL["foot"].add_child(loot_btn)
 	loot_use = ui_button("USAR", _inv_use, "o")
-	loot_use.custom_minimum_size = Vector2(110, 40)
-	strip.add_child(loot_use)
+	loot_use.custom_minimum_size = Vector2(110, 50)
+	paneR["foot"].add_child(loot_use)
 	loot_drop = ui_button("LARGAR", _inv_drop, "r")
-	loot_drop.custom_minimum_size = Vector2(110, 40)
-	strip.add_child(loot_drop)
+	loot_drop.custom_minimum_size = Vector2(110, 50)
+	paneR["foot"].add_child(loot_drop)
+	loot_detail = lbl("", 17, Color("#ecebe6"))
+	loot_detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	loot_detail.clip_text = true
+	paneR["foot"].add_child(loot_detail)
+	var cl = ui_button("FECHAR", close_loot)
+	cl.custom_minimum_size = Vector2(130, 50)
+	paneR["foot"].add_child(cl)
 	loot_ui.visible = false
 	ui.add_child(loot_ui)
-
-
-func item_tile(st: Dictionary, cb: Callable, price = -1, selected = false) -> Button:
-	var b = Button.new()
-	b.custom_minimum_size = Vector2(94, 94)
-	var unit = int(st["v"]) if st["id"] == "cash" else int(item_def(st["id"])["v"])
-	var bg = Color("#24402c") if st["id"] == "cash" else rarity_col(unit)
-	if item_def(st["id"])["cat"] == "historia":
-		bg = Color("#6a5a22")
-	var s = flat(bg, 5, GOLD if selected else bg.lightened(0.22), 3 if selected else 1)
-	b.add_theme_stylebox_override("normal", s)
-	b.add_theme_stylebox_override("hover", s)
-	b.add_theme_stylebox_override("pressed", flat(bg.lightened(0.15), 5, GOLD, 2))
-	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	var tex = icon_tex(st["id"])
-	if tex != null:
-		var tr = TextureRect.new()
-		tr.texture = tex
-		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tr.set_anchors_preset(Control.PRESET_FULL_RECT)
-		tr.offset_left = 14
-		tr.offset_top = 6
-		tr.offset_right = -14
-		tr.offset_bottom = -24
-		b.add_child(tr)
-	if st.has("q") and int(st["q"]) > 1:
-		var ql = lbl("×%d" % st["q"], 15, Color.WHITE)
-		ql.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		ql.set_anchors_preset(Control.PRESET_TOP_WIDE)
-		ql.offset_right = -6
-		ql.offset_top = 2
-		ql.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
-		b.add_child(ql)
-	var shown = price if price >= 0 else stack_value(st)
-	if shown > 0:
-		var vl = lbl(fmt(shown), 13, Color("#9be0a8") if price >= 0 else Color("#e8dfc8"))
-		vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		vl.offset_top = -22
-		vl.offset_bottom = -3
-		b.add_child(vl)
-	b.pressed.connect(cb)
-	return b
-
-
-func text_tile(top: String, bottom: String) -> PanelContainer:
-	var p = PanelContainer.new()
-	p.custom_minimum_size = Vector2(94, 94)
-	p.add_theme_stylebox_override("panel", flat(Color("#2a2e37"), 5, Color("#454b57"), 1))
-	var v = VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	var a = lbl(top, 13, Color("#ecebe6"))
-	a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	a.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(a)
-	var b = lbl(bottom, 12, DIM)
-	b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(b)
-	p.add_child(v)
-	return p
 
 
 func _open_grid(m: String) -> void:
 	mode = "loot"
 	loot_mode = m
-	inv_sel = -1
+	inv_sel = null
 	joy = {}
 	cam_drag = {}
 	firing = false
+	normalize_inv()
 	refresh_loot()
 	loot_ui.visible = true
 
@@ -4595,94 +4631,184 @@ func open_sell(v: Dictionary) -> void:
 	_open_grid("sell")
 
 
-func clear_grid(g: GridContainer) -> void:
-	for ch in g.get_children():
-		g.remove_child(ch)
-		ch.queue_free()
+func cont_dims(c: Dictionary) -> Vector2i:
+	if c.get("kind", "") == "cofre":
+		return Vector2i(6, 5)
+	if c.get("kind", "") in ["caixa", "maquina"]:
+		return Vector2i(4, 3)
+	return Vector2i(5, 4)
 
 
 func refresh_loot() -> void:
-	clear_grid(loot_grid)
-	clear_grid(bag_grid)
+	var d = bag_dims()
+	var gR = paneR["grid"]
+	var gL = paneL["grid"]
+	gR.setup(self, d.x, d.y, 62.0)
+	gR.items = S["inv"]
+	gR.selected = inv_sel
+	gR.price_fn = null
+	paneR["title"].text = bag_def()["name"].to_upper()
+	paneR["info"].text = fmt(inv_value())
+	paneR["sub"].text = "%d / %d espaços" % [cells_used(S["inv"]), d.x * d.y]
 	loot_use.visible = false
 	loot_drop.visible = false
 	loot_detail.text = ""
-	bag_title.text = "SACO"
-	loot_bag_info.text = "%.1f / %d kg" % [inv_kg(), bag_def()["cap"]]
+	gL.visible = true
 	if loot_mode == "loot":
-		loot_title.text = str(loot_c["n"]).to_upper()
-		loot_btn.text = "PEGAR TUDO"
+		var cd = cont_dims(loot_c)
+		gL.setup(self, cd.x, cd.y, 62.0)
+		gL.items = loot_c["items"]
+		gL.price_fn = null
+		paneL["title"].text = str(loot_c["n"]).to_upper()
 		var tot = 0
-		var items: Array = loot_c["items"]
-		for i in items.size():
-			var idx = i
-			tot += stack_value(items[i])
-			loot_grid.add_child(item_tile(items[i], func(): _loot_take(idx)))
-		loot_info.text = fmt(tot) if tot > 0 else ""
-		for st in S["inv"]:
-			bag_grid.add_child(item_tile(st, func(): pass))
+		var hidden = 0
+		for it in loot_c["items"]:
+			if it.get("hid", false):
+				hidden += 1
+			else:
+				tot += stack_value(it)
+		paneL["info"].text = fmt(tot) if tot > 0 else ""
+		paneL["sub"].text = "A revistar…" if hidden > 0 else "Arrasta ou toca para passar para a mochila"
+		loot_btn.text = "PEGAR TUDO"
+		loot_btn.disabled = hidden > 0
 	elif loot_mode == "sell":
 		var v = sell_van
-		loot_title.text = str(v["type"]["name"]).to_upper()
-		loot_info.text = "+30% " + D.CAT_NAMES[v["type"]["cat"]]
+		gL.visible = false
+		gR.price_fn = func(it): return van_price(it, v)
+		paneL["title"].text = str(v["type"]["name"]).to_upper()
+		paneL["info"].text = fmt(v["table"]) if int(v["table"]) > 0 else ""
+		paneL["sub"].text = "Paga +30%% por %s. Toca num item da mochila para vender.\nO dinheiro fica na mesa: recolhe-o e foge." % D.CAT_NAMES[v["type"]["cat"]]
 		loot_btn.text = "VENDER TUDO"
-		for i in S["inv"].size():
-			var st = S["inv"][i]
-			var pr = van_price(st, v)
-			if pr <= 0:
-				continue
-			var idx2 = i
-			loot_grid.add_child(item_tile(st, func(): _sell_one(idx2), pr))
-		bag_title.text = "MESA"
-		loot_bag_info.text = fmt(v["table"])
-		if int(v["table"]) > 0:
-			bag_grid.add_child(item_tile({"id": "cash", "v": int(v["table"])}, func(): pass))
-		loot_detail.text = "O dinheiro fica na mesa: recolhe-o e foge."
+		loot_btn.disabled = false
 	else:
-		loot_title.text = "EQUIPAMENTO"
-		loot_info.text = "Cofre " + fmt(S["money"])
-		loot_btn.text = "OPÇÕES"
-		loot_grid.add_child(text_tile(weapon()["name"], "arma"))
-		loot_grid.add_child(text_tile(bag_def()["name"], "%d kg" % bag_def()["cap"]))
-		loot_grid.add_child(text_tile(car_def()["name"], "carro"))
+		gL.setup(self, 4, 3, 62.0)
+		var eq = []
+		var ids = []
 		for tl in D.TOOLS:
 			if has_tool(tl["id"]):
-				loot_grid.add_child(item_tile({"id": tl["id"], "q": 1}, func(): pass))
+				ids.append(tl["id"])
 		if int(S["ties"]) > 0:
-			loot_grid.add_child(item_tile({"id": "abracadeiras", "q": int(S["ties"])}, func(): pass))
-		for i in S["inv"].size():
-			var idx3 = i
-			bag_grid.add_child(item_tile(S["inv"][i], func(): _inv_select(idx3), -1, i == inv_sel))
-		if inv_sel >= 0 and inv_sel < S["inv"].size():
-			var st2 = S["inv"][inv_sel]
-			var it = item_def(st2["id"])
-			loot_detail.text = "%s · %.1f kg · %s" % [it["n"], stack_kg(st2), fmt(stack_value(st2))]
+			ids.append("abracadeiras")
+		for i in ids.size():
+			eq.append({"id": ids[i], "q": int(S["ties"]) if ids[i] == "abracadeiras" else 1, "x": i % 4, "y": i / 4})
+		gL.items = eq
+		gL.price_fn = func(it): return 0
+		paneL["title"].text = "EQUIPAMENTO"
+		paneL["info"].text = "Cofre " + fmt(S["money"])
+		paneL["sub"].text = "%s · %s · %s" % [weapon()["name"], car_def()["name"], bag_def()["name"]]
+		loot_btn.text = "OPÇÕES"
+		loot_btn.disabled = false
+		if inv_sel != null:
+			var it = item_def(inv_sel["id"])
+			loot_detail.text = it["n"]
 			loot_use.visible = it.has("use")
-			loot_drop.visible = st2["id"] != "cash" or true
+			loot_drop.visible = true
+	gL.queue_redraw()
+	gR.queue_redraw()
 
 
-func _inv_select(idx: int) -> void:
-	inv_sel = idx
+func _grid_tapped(g, it: Dictionary) -> void:
+	var gR = paneR["grid"]
+	var gL = paneL["grid"]
+	if loot_mode == "loot":
+		var dst = gR if g == gL else gL
+		quick_move(g, dst, it)
+	elif loot_mode == "sell":
+		if g == gR:
+			_sell_item(it)
+	else:
+		if g == gR:
+			inv_sel = it if inv_sel != it else null
 	refresh_loot()
 
 
-func _inv_use() -> void:
-	if inv_sel < 0 or inv_sel >= S["inv"].size():
+func quick_move(src, dst, it: Dictionary) -> void:
+	var st = it.duplicate()
+	st.erase("x")
+	st.erase("y")
+	var n = grid_add(dst.items, dst.cols, dst.rows, st)
+	var key = "v" if it["id"] == "cash" else "q"
+	var total = int(it.get(key, 1))
+	if n <= 0:
+		toast("Não há espaço", RED)
 		return
-	var st = S["inv"][inv_sel]
-	if item_def(st["id"]).get("use", "") == "heal":
+	if n >= total:
+		src.items.erase(it)
+	else:
+		it[key] = total - n
+		toast("Não coube tudo", RED)
+
+
+func _grid_dropped(src, dst, it: Dictionary, cell: Vector2i) -> void:
+	if loot_mode == "sell":
+		return
+	if loot_mode == "inv" and (src != paneR["grid"] or dst != paneR["grid"]):
+		return
+	var sz = item_size(it["id"])
+	# juntar à pilha do mesmo item que está por baixo
+	for o in dst.items:
+		if o != it and o["id"] == it["id"] and not o.get("hid", false):
+			var s2 = item_size(o["id"])
+			if cell.x >= int(o["x"]) - sz.x + 1 and cell.x <= int(o["x"]) + s2.x - 1 and cell.y >= int(o["y"]) - sz.y + 1 and cell.y <= int(o["y"]) + s2.y - 1:
+				var key = "v" if it["id"] == "cash" else "q"
+				var mx = CASH_MAX if it["id"] == "cash" else item_max(it["id"])
+				var add = mini(int(it.get(key, 1)), mx - int(o.get(key, 1)))
+				if add > 0:
+					o[key] = int(o.get(key, 1)) + add
+					it[key] = int(it.get(key, 1)) - add
+					if int(it[key]) <= 0:
+						src.items.erase(it)
+					refresh_loot()
+					return
+	if not grid_fits(dst.items, dst.cols, dst.rows, cell.x, cell.y, sz, it):
+		return
+	if src != dst:
+		src.items.erase(it)
+		dst.items.append(it)
+	it["x"] = cell.x
+	it["y"] = cell.y
+	refresh_loot()
+
+
+func update_reveal(dt: float) -> void:
+	## revela os itens do contentor um a um (os mais valiosos demoram mais)
+	if loot_mode != "loot" or loot_c.is_empty():
+		return
+	var changed = false
+	for it in loot_c["items"]:
+		if float(it.get("flash", 0.0)) > 0.0:
+			it["flash"] = maxf(0.0, float(it["flash"]) - dt * 1.6)
+	for it in loot_c["items"]:
+		if it.get("hid", false):
+			var need = 0.35 + 0.22 * item_tier(it)
+			it["rev"] = float(it.get("rev", 0.0)) + dt
+			if it["rev"] >= need:
+				it["hid"] = false
+				it["flash"] = 1.0
+				changed = true
+			break
+	if changed:
+		refresh_loot()
+
+
+func _inv_use() -> void:
+	if inv_sel == null:
+		return
+	if item_def(inv_sel["id"]).get("use", "") == "heal":
 		S["hp"] = minf(100.0, float(S["hp"]) + 60.0)
-		remove_item(st["id"], 1)
+		inv_sel["q"] = int(inv_sel.get("q", 1)) - 1
+		if int(inv_sel["q"]) <= 0:
+			S["inv"].erase(inv_sel)
 		toast("Vida recuperada", OK_C)
-	inv_sel = -1
+	inv_sel = null
 	refresh_loot()
 
 
 func _inv_drop() -> void:
-	if inv_sel < 0 or inv_sel >= S["inv"].size():
+	if inv_sel == null:
 		return
-	S["inv"].remove_at(inv_sel)
-	inv_sel = -1
+	S["inv"].erase(inv_sel)
+	inv_sel = null
 	refresh_loot()
 
 
@@ -4696,51 +4822,33 @@ func _loot_left_btn() -> void:
 		menu_options()
 
 
-func _loot_take(idx: int) -> void:
-	var items: Array = loot_c["items"]
-	if idx >= items.size():
-		return
-	var st = items[idx]
-	var n = add_stack(st)
-	if n <= 0:
-		toast("Saco cheio", RED)
-		return
-	if st["id"] == "cash" or n >= int(st["q"]):
-		items.remove_at(idx)
-	else:
-		st["q"] = int(st["q"]) - n
-		toast("Saco cheio", RED)
-	refresh_loot()
-
-
 func _loot_take_all() -> void:
 	if loot_c.is_empty():
 		return
-	var left = []
-	for st in loot_c["items"]:
-		var n = add_stack(st)
-		if st["id"] == "cash":
-			if n <= 0:
-				left.append(st)
-		elif n < int(st["q"]):
-			st["q"] = int(st["q"]) - n
-			left.append(st)
-	loot_c["items"] = left
-	if not left.is_empty():
-		toast("Saco cheio", RED)
+	var d = bag_dims()
+	var full_bag = false
+	for it in loot_c["items"].duplicate():
+		if it.get("hid", false):
+			continue
+		var st = it.duplicate()
+		var n = grid_add(S["inv"], d.x, d.y, st)
+		var key = "v" if it["id"] == "cash" else "q"
+		if n >= int(it.get(key, 1)):
+			loot_c["items"].erase(it)
+		else:
+			it[key] = int(it.get(key, 1)) - n
+			full_bag = true
+	if full_bag:
+		toast("Mochila cheia — compra uma maior no Armeiro", RED)
 	refresh_loot()
 
 
-func _sell_one(idx: int) -> void:
-	if idx >= S["inv"].size():
-		return
-	var st = S["inv"][idx]
-	var pr = van_price(st, sell_van)
+func _sell_item(it: Dictionary) -> void:
+	var pr = van_price(it, sell_van)
 	if pr <= 0:
 		return
-	S["inv"].remove_at(idx)
+	S["inv"].erase(it)
 	van_sold(sell_van, pr)
-	refresh_loot()
 
 
 func _sell_all() -> void:
@@ -4760,8 +4868,12 @@ func _sell_all() -> void:
 
 
 func close_loot() -> void:
+	if loot_mode == "loot" and not loot_c.is_empty():
+		for it in loot_c["items"]:
+			it["hid"] = false
 	loot_ui.visible = false
 	loot_c = {}
+	inv_sel = null
 	if mode == "loot":
 		mode = "play"
 	last_act = "?"
@@ -4959,16 +5071,20 @@ func menu_arm(box: VBoxContainer) -> void:
 		buy_row(box, w, S["weapons"].has(wid), S["weapon"] == wid, sub, func():
 			S["weapons"].append(wid)
 			S["weapon"] = wid, func(): S["weapon"] = wid)
-	h3(box, "Sacos")
+	h3(box, "Mochilas")
 	for b in D.BAGS:
 		var bid: String = b["id"]
-		var capb: int = b["cap"]
-		buy_row(box, b, S["bags"].has(bid), S["bag"] == bid, "%d kg" % capb, func():
+		buy_row(box, b, S["bags"].has(bid), S["bag"] == bid, "%d × %d espaços" % [b["g"][0], b["g"][1]], func():
 			S["bags"].append(bid)
-			S["bag"] = bid, func():
-			if inv_kg() > capb:
-				toast("Demasiado peso para esse saco", RED)
+			var pk = grid_pack(S["inv"], int(b["g"][0]), int(b["g"][1]))
+			if pk != null:
+				S["inv"] = pk
+				S["bag"] = bid, func():
+			var packed = grid_pack(S["inv"], int(b["g"][0]), int(b["g"][1]))
+			if packed == null:
+				toast("As tuas coisas não cabem nessa mochila", RED)
 				return
+			S["inv"] = packed
 			S["bag"] = bid)
 
 
