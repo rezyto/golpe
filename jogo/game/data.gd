@@ -10,10 +10,13 @@ const WEAPONS := [
 ]
 
 const CARS := [
-	{"id": "pardal", "name": "Pardal", "price": 0, "spd": 20.0, "hp": 100, "col": "#d9a441", "model": "car_hatchback", "lvl": 1, "d": "Pequeno e fiável"},
-	{"id": "mula", "name": "Carrinha Mula", "price": 40000, "spd": 18.0, "hp": 190, "col": "#7d8a96", "model": "car_stationwagon", "lvl": 2, "d": "Lenta mas aguenta pancada"},
-	{"id": "lince", "name": "Lince GT", "price": 120000, "spd": 27.0, "hp": 120, "col": "#c0392b", "model": "car_sedan", "lvl": 4, "d": "O mais rápido da cidade"},
-	{"id": "touro", "name": "Touro", "price": 250000, "spd": 23.5, "hp": 280, "col": "#2e6b4f", "model": "car_taxi", "lvl": 6, "d": "Rápido e resistente"},
+	{"id": "pardal", "name": "Pardal 1.2", "spec": "hatch", "price": 0, "spd": 20.0, "hp": 100, "col": "#b8312c", "lvl": 1, "trunk": [4, 3], "d": "Utilitário citadino"},
+	{"id": "mula", "name": "Mula Break", "spec": "estate", "price": 40000, "spd": 18.5, "hp": 190, "col": "#7d8a96", "lvl": 2, "trunk": [6, 5], "d": "Carrinha familiar, mala enorme"},
+	{"id": "valenca", "name": "Valença S", "spec": "sedan", "price": 90000, "spd": 25.0, "hp": 150, "col": "#1c1d20", "lvl": 3, "trunk": [5, 4], "d": "Berlina executiva"},
+	{"id": "lince", "name": "Lince GT", "spec": "coupe", "price": 120000, "spd": 27.0, "hp": 125, "col": "#2a5a8a", "lvl": 4, "trunk": [4, 3], "d": "Coupé desportivo"},
+	{"id": "atlas", "name": "Atlas Sport", "spec": "suv", "price": 180000, "spd": 23.5, "hp": 280, "col": "#2f3a2f", "lvl": 5, "trunk": [6, 4], "d": "SUV de luxo, aguenta tudo"},
+	{"id": "bisonte", "name": "Bisonte V8", "spec": "muscle", "price": 220000, "spd": 29.0, "hp": 170, "col": "#e0a21a", "lvl": 5, "trunk": [4, 3], "d": "Muscle car, puro motor"},
+	{"id": "furia", "name": "Fúria GT", "spec": "super", "price": 600000, "spd": 36.0, "hp": 110, "col": "#7ac142", "lvl": 6, "trunk": [3, 2], "d": "Superdesportivo, mala minúscula"},
 ]
 
 const BAGS := [

@@ -121,6 +121,8 @@ var mg_bar: Control
 var mg_btn: Button
 var lbl_speed: Label
 var panic_t = 0.0
+var stand_pivot: Node3D
+var stand_sel = ""
 var ui_font: Font
 var icon_cache = {}
 var loot_mode = "loot"
@@ -307,6 +309,34 @@ func shots() -> void:
 		await tr.process_frame
 	await shot("18_conducao_curva")
 	exit_car()
+	# carros em fila para revisão
+	var lineup = Node3D.new()
+	add_child(lineup)
+	var kinds = ["hatch", "estate", "sedan", "coupe", "suv", "muscle", "super"]
+	var cols = ["#b8312c", "#7d8a96", "#1c1d20", "#2a5a8a", "#2f3a2f", "#e0a21a", "#7ac142"]
+	for k in kinds.size():
+		var lc = make_proc_car(kinds[k], cols[k])
+		lc.position = Vector3(30.0 + k * 6.0, 0.0, 97.5)
+		lc.rotation.y = -PI / 2
+		lineup.add_child(lc)
+	P["x"] = 48.0
+	P["y"] = 101.0
+	cam_dbg = Vector3(-2.0, 3.0, 9.0)
+	await tr.create_timer(0.6).timeout
+	await shot("18b_carros")
+	cam_dbg = Vector3(4.0, 1.4, 3.0)
+	P["x"] = 66.0
+	P["y"] = 98.5
+	await tr.create_timer(0.4).timeout
+	await shot("18c_superdesportivo")
+	cam_dbg = Vector3.ZERO
+	lineup.queue_free()
+	open_shop("stand")
+	stand_sel = "bisonte"
+	refresh_menu()
+	await tr.create_timer(0.5).timeout
+	await shot("19_stand")
+	close_menu()
 	open_shop("armeiro")
 	await shot("20_armeiro")
 	close_menu()
@@ -453,6 +483,22 @@ func autotest() -> void:
 		drive_player(car, Vector2(1, 0), 0.05, car_def())
 	print("autotest: velocidade ", int(car["spd"] * 3.6), " km/h, carro ", int(S["car_hp"]))
 	exit_car()
+	var tp = trunk_point()
+	P["x"] = tp.x
+	P["y"] = tp.y
+	await tr.process_frame
+	do_action()
+	var tmode = mode
+	add_stack({"id": "relogio", "q": 1})
+	quick_move(paneR["grid"], paneL["grid"], S["inv"][S["inv"].size() - 1])
+	close_loot()
+	print("autotest: mala modo ", tmode, " itens na mala ", S["trunks"].get(S["car"], []).size())
+	open_shop("stand")
+	await tr.process_frame
+	stand_sel = "furia"
+	refresh_menu()
+	await tr.process_frame
+	close_menu()
 	var v = vans[0]
 	P["x"] = v["nx"]
 	P["y"] = v["ny"]
@@ -529,7 +575,7 @@ func now_ms() -> float:
 #  GRAVAÇÃO
 # =====================================================================
 func default_save() -> Dictionary:
-	return {"ver": 4, "story": 0, "paid": 0, "tools": [], "ties": 0, "nick": "", "money": 5000, "xp": 0, "lvl": 1, "hp": 100.0, "weapon": "p22", "weapons": ["p22"],
+	return {"ver": 4, "trunks": {}, "story": 0, "paid": 0, "tools": [], "ties": 0, "nick": "", "money": 5000, "xp": 0, "lvl": 1, "hp": 100.0, "weapon": "p22", "weapons": ["p22"],
 		"car": "pardal", "cars": ["pardal"], "car_hp": 100.0, "bag": "b10", "bags": ["b10"], "props": {}, "terr": {},
 		"inv": [], "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
 		"stats": {"heists": 0, "busted": 0, "earned": 0, "hospital": 0}}
@@ -845,6 +891,12 @@ func cyl(r_top: float, r_bot: float, h: float, m: Material, pos: Vector3, parent
 
 
 func make_car(col: String, pol: bool, model = "") -> Node3D:
+	if pol:
+		return make_proc_car("sedan", "#eef0f2", true)
+	if model != "" and CAR_SPECS.has(model):
+		var pc = make_proc_car(model, col)
+		pc.set_meta("spec", model)
+		return pc
 	var kk = null
 	if pol:
 		kk = make_kaykit_car("car_police")
@@ -889,6 +941,11 @@ func make_car(col: String, pol: bool, model = "") -> Node3D:
 
 
 func make_simple_car(col: String, parent: Node3D, pos: Vector3, ang: float) -> Node3D:
+	var pcv = make_proc_car(CIV_SPECS[randi() % CIV_SPECS.size()], CIV_COLS[randi() % CIV_COLS.size()])
+	pcv.position = pos
+	pcv.rotation.y = -ang
+	parent.add_child(pcv)
+	return pcv
 	## carro estacionado/trânsito com menos peças (desempenho)
 	var kk = make_kaykit_car(CIV_CARS[randi() % CIV_CARS.size()])
 	if kk:
@@ -1825,7 +1882,7 @@ func finish_zone(z: Dictionary, r: RandomNumberGenerator, n_parked: int) -> void
 			continue
 		var hw = 2.1 if horiz else 0.95
 		var hh = 0.95 if horiz else 2.1
-		var blk = {"x": px - hw, "y": py - hh, "w": hw * 2.0, "h": hh * 2.0, "hgt": 1.7, "car": true, "cx": px, "cy": py, "ang": ang, "col": ["#8a2b2b", "#2b4a8a", "#d8d8d8", "#2f2f33", "#6a7a3a", "#b88a2b"][r.randi() % 6]}
+		var blk = {"x": px - hw, "y": py - hh, "w": hw * 2.0, "h": hh * 2.0, "hgt": 1.7, "car": true, "cx": px, "cy": py, "ang": ang, "col": "#ffffff"}
 		z["parked"].append(blk)
 		z["blocks"].append(blk)
 
@@ -2216,7 +2273,7 @@ func enter_place(id: String) -> void:
 		P["y"] = car["y"]
 		P["ang"] = 0.0
 		cam_yaw = yaw_behind(0.0)
-	car["mesh"] = make_car(cd["col"], false, cd.get("model", ""))
+	car["mesh"] = make_car(cd["col"], false, cd.get("spec", "hatch"))
 	add_child(car["mesh"])
 	Z["spawn"] = {"x": P["x"], "y": P["y"]}
 	build_world()
@@ -2362,6 +2419,7 @@ func update_life(dt: float) -> void:
 			c["stop"] = 2.0
 		var m: Node3D = c["mesh"]
 		m.position = Vector3(c["x"], 0, c["y"])
+		spin_wheels(m, float(c["cur"]), 0.0, dt)
 		keep.append(c)
 	civ = keep
 	var nc = 9 if Z["kind"] == "city" else 3
@@ -2428,6 +2486,275 @@ func update_life(dt: float) -> void:
 	var np = 10 if Z["kind"] == "city" else 4
 	if peds.size() < np and randf() < dt * 3.0:
 		spawn_ped(false)
+
+
+# =====================================================================
+#  CARROS MODELADOS POR CÓDIGO (carroçaria em loft, rodas que giram e viram)
+# =====================================================================
+## t: 0 = traseira, 1 = frente. body = [t, altura do capô/tejadilho da carroçaria]; roof = perfil do habitáculo
+const CAR_SPECS = {
+	"hatch": {"L": 3.95, "W": 1.72, "clear": 0.32, "r": 0.31, "ax": [0.16, 0.84], "body": [[0.0, 0.98], [0.06, 1.02], [0.66, 0.97], [0.86, 0.86], [1.0, 0.7]], "cs": 0.04, "ce": 0.7, "roof": [[0.04, 0.0], [0.08, 1.5], [0.48, 1.52], [0.7, 0.0]]},
+	"sedan": {"L": 4.85, "W": 1.86, "clear": 0.3, "r": 0.34, "ax": [0.17, 0.81], "body": [[0.0, 0.92], [0.16, 0.99], [0.3, 0.99], [0.66, 0.94], [0.86, 0.88], [1.0, 0.72]], "cs": 0.2, "ce": 0.7, "roof": [[0.2, 0.0], [0.34, 1.44], [0.55, 1.46], [0.7, 0.0]]},
+	"coupe": {"L": 4.55, "W": 1.86, "clear": 0.26, "r": 0.34, "ax": [0.18, 0.82], "body": [[0.0, 0.86], [0.14, 0.92], [0.68, 0.86], [1.0, 0.66]], "cs": 0.18, "ce": 0.66, "roof": [[0.18, 0.0], [0.38, 1.31], [0.5, 1.31], [0.66, 0.0]]},
+	"muscle": {"L": 4.85, "W": 1.94, "clear": 0.28, "r": 0.37, "ax": [0.17, 0.8], "body": [[0.0, 0.96], [0.08, 1.0], [0.6, 0.99], [0.9, 0.96], [1.0, 0.82]], "cs": 0.12, "ce": 0.6, "roof": [[0.12, 0.0], [0.36, 1.33], [0.47, 1.33], [0.6, 0.0]], "spoiler": "lip", "scoop": true},
+	"suv": {"L": 4.95, "W": 2.0, "clear": 0.46, "r": 0.43, "ax": [0.17, 0.81], "body": [[0.0, 1.2], [0.05, 1.26], [0.74, 1.23], [0.88, 1.19], [1.0, 1.02]], "cs": 0.03, "ce": 0.76, "roof": [[0.03, 0.0], [0.05, 1.95], [0.66, 1.97], [0.76, 0.0]], "bars": true},
+	"super": {"L": 4.65, "W": 2.06, "clear": 0.2, "r": 0.36, "ax": [0.19, 0.83], "body": [[0.0, 0.88], [0.12, 0.92], [0.42, 0.84], [0.74, 0.7], [1.0, 0.5]], "cs": 0.28, "ce": 0.72, "roof": [[0.28, 0.0], [0.42, 1.16], [0.52, 1.15], [0.72, 0.0]], "spoiler": "wing", "intake": true},
+	"estate": {"L": 4.95, "W": 1.9, "clear": 0.32, "r": 0.33, "ax": [0.16, 0.82], "body": [[0.0, 1.0], [0.68, 0.97], [0.86, 0.9], [1.0, 0.74]], "cs": 0.02, "ce": 0.72, "roof": [[0.02, 0.0], [0.04, 1.56], [0.6, 1.58], [0.72, 0.0]]},
+}
+const CIV_SPECS = ["hatch", "hatch", "sedan", "sedan", "estate", "suv", "coupe", "muscle", "super"]
+const CIV_COLS = ["#e9e9e7", "#e9e9e7", "#1c1d20", "#1c1d20", "#9aa0a6", "#6a6e74", "#2a3a5a", "#7a1e22", "#c9c2b0", "#3a4a3a", "#2a5a8a"]
+var car_mesh_cache = {}
+var paint_cache = {}
+
+
+func pinterp(prof: Array, t: float) -> float:
+	if t <= prof[0][0]:
+		return prof[0][1]
+	for i in range(1, prof.size()):
+		if t <= prof[i][0]:
+			var a = prof[i - 1]
+			var b = prof[i]
+			var q = (t - a[0]) / maxf(0.0001, b[0] - a[0])
+			return lerpf(a[1], b[1], smoothstep(0.0, 1.0, q))
+	return prof[prof.size() - 1][1]
+
+
+func quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	st.add_vertex(a)
+	st.add_vertex(b)
+	st.add_vertex(c)
+	st.add_vertex(a)
+	st.add_vertex(c)
+	st.add_vertex(d)
+
+
+func car_body_mesh(kind: String) -> ArrayMesh:
+	if car_mesh_cache.has(kind):
+		return car_mesh_cache[kind]
+	var sp = CAR_SPECS[kind]
+	var L: float = sp["L"]
+	var hw: float = sp["W"] / 2.0
+	var clear: float = sp["clear"]
+	var paint = SurfaceTool.new()
+	var glass = SurfaceTool.new()
+	var dark = SurfaceTool.new()
+	for s in [paint, glass, dark]:
+		s.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# carroçaria: anéis de 8 pontos ao longo do comprimento
+	var N = 28
+	var rings = []
+	for i in N + 1:
+		var t = float(i) / N
+		var e = absf(2.0 * t - 1.0)
+		var w = hw * (1.0 - 0.14 * pow(e, 7.0))
+		var top = pinterp(sp["body"], t)
+		var b = clear + 0.14 * pow(e, 5.0)
+		var x = (t - 0.5) * L
+		rings.append([Vector3(x, b, -(w - 0.1)), Vector3(x, b + 0.16, -w), Vector3(x, top - 0.14, -w), Vector3(x, top, -(w - 0.16)),
+			Vector3(x, top, w - 0.16), Vector3(x, top - 0.14, w), Vector3(x, b + 0.16, w), Vector3(x, b, w - 0.1)])
+	for i in N:
+		var r0 = rings[i]
+		var r1 = rings[i + 1]
+		for j in 8:
+			var k = (j + 1) % 8
+			var tgt = dark if j == 7 or j == 0 or j == 6 else paint
+			quad(tgt, r0[j], r1[j], r1[k], r0[k])
+	for endi in [0, N]:
+		var r = rings[endi]
+		var c = Vector3(r[0].x, (r[0].y + r[3].y) / 2.0, 0)
+		for j in 8:
+			var k = (j + 1) % 8
+			if endi == 0:
+				paint.add_vertex(c)
+				paint.add_vertex(r[j])
+				paint.add_vertex(r[k])
+			else:
+				paint.add_vertex(c)
+				paint.add_vertex(r[k])
+				paint.add_vertex(r[j])
+	# habitáculo: vidros nos lados e no para-brisas, tejadilho pintado
+	var cs: float = sp["cs"]
+	var ce: float = sp["ce"]
+	var M = 16
+	var crings = []
+	for i in M + 1:
+		var t = lerpf(cs, ce, float(i) / M)
+		var base = pinterp(sp["body"], t) - 0.01
+		var rf = pinterp(sp["roof"], t)
+		var roof = maxf(base, rf) if rf > 0.0 else base
+		var e = absf(2.0 * t - 1.0)
+		var w = hw * (1.0 - 0.14 * pow(e, 7.0))
+		var wb = w - 0.17
+		var wr = w * 0.72
+		var x = (t - 0.5) * L
+		crings.append([Vector3(x, base, -wb), Vector3(x, maxf(base, roof - 0.05), -wr), Vector3(x, roof, -(wr - 0.06)),
+			Vector3(x, roof, wr - 0.06), Vector3(x, maxf(base, roof - 0.05), wr), Vector3(x, base, wb)])
+	for i in M:
+		var a = crings[i]
+		var b = crings[i + 1]
+		var slope = absf(b[2].y - a[2].y) / maxf(0.001, absf(b[2].x - a[2].x))
+		quad(glass, a[0], b[0], b[1], a[1])
+		quad(glass, a[4], b[4], b[5], a[5])
+		var top_t = glass if slope > 0.45 else paint
+		quad(top_t, a[1], b[1], b[2], a[2])
+		quad(top_t, a[2], b[2], b[3], a[3])
+		quad(top_t, a[3], b[3], b[4], a[4])
+	var mesh = ArrayMesh.new()
+	for s in [paint, glass, dark]:
+		s.index()
+		s.generate_normals()
+		s.commit(mesh)
+	car_mesh_cache[kind] = mesh
+	return mesh
+
+
+func paint_mat(col: String) -> StandardMaterial3D:
+	if paint_cache.has(col):
+		return paint_cache[col]
+	var m = StandardMaterial3D.new()
+	m.albedo_color = Color(col)
+	m.metallic = 0.55
+	m.roughness = 0.22
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	paint_cache[col] = m
+	return m
+
+
+func make_proc_car(kind: String, col: String, police = false) -> Node3D:
+	var sp = CAR_SPECS[kind]
+	var L: float = sp["L"]
+	var hw: float = sp["W"] / 2.0
+	var r: float = sp["r"]
+	var g = Node3D.new()
+	var body = MeshInstance3D.new()
+	body.mesh = car_body_mesh(kind)
+	body.set_surface_override_material(0, paint_mat(col))
+	var gm = mat("#141a22", 0.08, 0.7)
+	gm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	body.set_surface_override_material(1, gm)
+	var dm = mat("#151618", 0.8)
+	dm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	body.set_surface_override_material(2, dm)
+	g.add_child(body)
+	var front_t = pinterp(sp["body"], 1.0)
+	var rear_t = pinterp(sp["body"], 0.0)
+	var fx = L / 2.0 - 0.02
+	var light = unshaded(Color("#fff6d8"))
+	var tail = unshaded(Color("#d42a22"))
+	for z in [-1.0, 1.0]:
+		box(Vector3(0.06, 0.11, 0.34), light, Vector3(fx, front_t - 0.12, z * (hw - 0.34)), g, false)
+		box(Vector3(0.06, 0.1, 0.38), tail, Vector3(-L / 2.0 + 0.02, rear_t - 0.13, z * (hw - 0.3)), g, false)
+		box(Vector3(0.24, 0.1, 0.1), paint_mat(col), Vector3(L * (sp["ce"] - 0.5) - 0.05, pinterp(sp["body"], sp["ce"]) + 0.12, z * (hw + 0.04)), g, false)
+	box(Vector3(0.05, maxf(0.12, front_t - sp["clear"] - 0.3), hw * 0.9), mat("#0e0f10", 0.6, 0.4), Vector3(fx + 0.005, (front_t + sp["clear"]) / 2.0 - 0.05, 0), g, false)
+	box(Vector3(0.03, 0.12, 0.5), mat("#f2f2ee"), Vector3(-L / 2.0 - 0.005, sp["clear"] + 0.28, 0), g, false)
+	box(Vector3(0.03, 0.12, 0.5), mat("#f2f2ee"), Vector3(L / 2.0 + 0.01, sp["clear"] + 0.18, 0), g, false)
+	box(Vector3(0.25, 0.07, 0.07), mat("#9aa0a6", 0.3, 0.9), Vector3(-L / 2.0 - 0.05, sp["clear"] + 0.06, hw * 0.55), g, false)
+	if sp.get("spoiler", "") == "wing":
+		box(Vector3(0.36, 0.05, sp["W"] * 0.9), paint_mat(col), Vector3(-L / 2.0 + 0.25, rear_t + 0.32, 0), g)
+		for z in [-0.55, 0.55]:
+			box(Vector3(0.08, 0.32, 0.05), dm, Vector3(-L / 2.0 + 0.28, rear_t + 0.16, z), g, false)
+	elif sp.get("spoiler", "") == "lip":
+		box(Vector3(0.14, 0.06, sp["W"] * 0.85), paint_mat(col), Vector3(-L / 2.0 + 0.12, rear_t + 0.03, 0), g, false)
+	if sp.get("scoop", false):
+		box(Vector3(0.7, 0.08, 0.5), dm, Vector3(L * 0.28, pinterp(sp["body"], 0.78) + 0.03, 0), g, false)
+	if sp.get("intake", false):
+		for z in [-1.0, 1.0]:
+			box(Vector3(0.6, 0.18, 0.04), dm, Vector3(-L * 0.12, sp["clear"] + 0.4, z * (hw + 0.005)), g, false)
+	if sp.get("bars", false):
+		for z in [-1.0, 1.0]:
+			box(Vector3(L * 0.5, 0.05, 0.05), mat("#2a2c30", 0.4, 0.6), Vector3(-L * 0.08, pinterp(sp["roof"], 0.4) + 0.06, z * hw * 0.62), g, false)
+	if police:
+		for z in [-1.0, 1.0]:
+			box(Vector3(L * 0.62, 0.16, 0.02), mat("#1f3a7a"), Vector3(0.0, sp["clear"] + 0.42, z * (hw + 0.004)), g, false)
+		var ry = pinterp(sp["roof"], (sp["cs"] + sp["ce"]) / 2.0) + 0.06
+		box(Vector3(0.3, 0.1, 1.2), mat("#1a1a1a"), Vector3(-0.1, ry, 0), g, false)
+		var lr = box(Vector3(0.26, 0.12, 0.5), unshaded(Color("#ff2a2a")), Vector3(-0.1, ry + 0.07, 0.3), g, false)
+		var lb = box(Vector3(0.26, 0.12, 0.5), unshaded(Color("#2a6aff")), Vector3(-0.1, ry + 0.07, -0.3), g, false)
+		g.set_meta("lr", lr)
+		g.set_meta("lb", lb)
+	# rodas: direção (y) -> cubo (gira em z) -> pneu e jante
+	var wheels = []
+	var tire = mat("#141414", 0.9)
+	var rim = mat("#b8bcc2", 0.25, 0.9)
+	for ai in 2:
+		var ax = (float(sp["ax"][ai]) - 0.5) * L
+		for z in [-1.0, 1.0]:
+			var steer = Node3D.new()
+			steer.position = Vector3(ax, r, z * (hw - 0.12))
+			g.add_child(steer)
+			var hub = Node3D.new()
+			steer.add_child(hub)
+			var t1 = cyl(r, r, 0.26, tire, Vector3.ZERO, hub, 14)
+			t1.rotation.x = PI / 2
+			var t2 = cyl(r * 0.62, r * 0.62, 0.27, rim, Vector3.ZERO, hub, 10)
+			t2.rotation.x = PI / 2
+			box(Vector3(r * 1.1, r * 0.18, 0.272), mat("#6a6e74", 0.3, 0.8), Vector3.ZERO, hub, false)
+			wheels.append([steer, hub, ai == 1])
+	g.set_meta("wheels", wheels)
+	g.set_meta("wr", r)
+	g.set_meta("col", col)
+	g.set_meta("body", paint_mat(col))
+	return g
+
+
+func spin_wheels(m: Node3D, spd: float, steer: float, dt: float) -> void:
+	if not m.has_meta("wheels"):
+		return
+	var r: float = m.get_meta("wr")
+	for w in m.get_meta("wheels"):
+		(w[1] as Node3D).rotation.z -= spd * dt / r
+		if w[2]:
+			(w[0] as Node3D).rotation.y = lerpf((w[0] as Node3D).rotation.y, steer, 0.25)
+
+
+# =====================================================================
+#  MALA DOS CARROS (grelha própria por carro)
+# =====================================================================
+func trunk_dims(id: String) -> Vector2i:
+	var cd = find_by_id(D.CARS, id)
+	var tg = cd.get("trunk", [4, 3])
+	return Vector2i(int(tg[0]), int(tg[1]))
+
+
+func trunk_point() -> Vector2:
+	var sp = CAR_SPECS[car_def().get("spec", "hatch")]
+	var f = Vector2(cos(car["ang"]), sin(car["ang"]))
+	return Vector2(car["x"], car["y"]) - f * (float(sp["L"]) / 2.0 + 0.6)
+
+
+func open_trunk() -> void:
+	var id: String = S["car"]
+	if not S["trunks"].has(id):
+		S["trunks"][id] = []
+	var d = trunk_dims(id)
+	open_loot({"n": "Mala — " + car_def()["name"], "items": S["trunks"][id], "dims": d, "trunk": true})
+
+
+func parked_trunk_near() -> Dictionary:
+	for q in Z.get("parked", []):
+		var f = Vector2(cos(q["ang"]), sin(q["ang"]))
+		var tp = Vector2(q["cx"], q["cy"]) - f * 2.9
+		if Vector2(P["x"], P["y"]).distance_to(tp) < 1.6:
+			return q
+	return {}
+
+
+func open_parked_trunk(q: Dictionary) -> void:
+	if not q.has("items"):
+		q["items"] = []
+		var table = [{"cash": [200, 1500]}, {"id": "telemovel", "ch": 0.4, "q": [1, 1]}, {"id": "portatil", "ch": 0.2, "q": [1, 1]},
+			{"id": "ferramentas", "ch": 0.35, "q": [1, 1]}, {"id": "tabaco", "ch": 0.4, "q": [1, 3]}, {"id": "mala", "ch": 0.12, "q": [1, 1]}, {"id": "bateria", "ch": 0.2, "q": [1, 1]}]
+		for st in roll_loot(table):
+			grid_add(q["items"], 4, 3, st)
+		for it in q["items"]:
+			it["hid"] = true
+			it["rev"] = 0.0
+		if randf() < 0.35:
+			wanted = maxi(wanted, 1)
+			lost_t = 0.0
+			cam_shake = 0.2
+			toast("Alarme do carro! Despacha-te", RED)
+	open_loot({"n": "Mala do carro", "items": q["items"], "dims": Vector2i(4, 3)})
 
 
 # =====================================================================
@@ -3693,6 +4020,11 @@ func ctx_action() -> Dictionary:
 	if not P["in_car"]:
 		if not search.is_empty():
 			return {"l": "…", "off": true}
+		if Vector2(P["x"], P["y"]).distance_to(trunk_point()) < 1.7:
+			return {"l": "MALA", "f": open_trunk}
+		var pq = parked_trunk_near()
+		if not pq.is_empty() and (pq.has("items") or has_tool("pe_cabra")):
+			return {"l": "ABRIR\nMALA", "f": func(): open_parked_trunk(pq)}
 		var v = near_van()
 		if not v.is_empty():
 			if int(v["table"]) > 0 and Vector2(P["x"] - v["tx"], P["y"] - v["ty"]).length() < 2.6:
@@ -3874,6 +4206,8 @@ func _process(delta: float) -> void:
 		update_reveal(dt)
 	if mode == "mini":
 		update_minigame(dt)
+	if mode == "menu" and stand_pivot != null and is_instance_valid(stand_pivot):
+		stand_pivot.rotation.y += dt * 0.45
 	if mode == "play":
 		if inside:
 			update_interior(dt)
@@ -4190,12 +4524,13 @@ func render(dt: float) -> void:
 	var cd = car_def()
 	if car.has("mesh") and not inside:
 		var cm: Node3D = car["mesh"]
-		if cm.get_meta("col") != cd["col"]:
+		if cm.get_meta("col") != cd["col"] or cm.get_meta("spec", "") != cd.get("spec", "hatch"):
 			cm.queue_free()
-			cm = make_car(cd["col"], false, cd.get("model", ""))
+			cm = make_car(cd["col"], false, cd.get("spec", "hatch"))
 			add_child(cm)
 			car["mesh"] = cm
 		car_visual(cm, car, dt)
+		spin_wheels(cm, float(car.get("spd", 0.0)), clampf(float(car.get("yawrate", 0.0)) * 0.3, -0.5, 0.5) if P["in_car"] else 0.0, dt)
 		var dead = float(S["car_hp"]) <= 0
 		if cm.get_meta("dead", false) != dead:
 			cm.set_meta("dead", dead)
@@ -4224,6 +4559,7 @@ func render(dt: float) -> void:
 		var m: Node3D = p["mesh"]
 		m.position = Vector3(p["x"], 0, p["y"])
 		m.rotation.y = -p["ang"]
+		spin_wheels(m, float(p["spd"]), 0.0, dt)
 		m.get_meta("lr").visible = flash
 		m.get_meta("lb").visible = not flash
 		var d = dist(P, p)
@@ -5542,6 +5878,8 @@ func open_sell(v: Dictionary) -> void:
 
 
 func cont_dims(c: Dictionary) -> Vector2i:
+	if c.has("dims"):
+		return c["dims"]
 	if c.get("kind", "") == "cofre":
 		return Vector2i(6, 5)
 	if c.get("kind", "") in ["caixa", "maquina"]:
@@ -6002,13 +6340,72 @@ func menu_arm(box: VBoxContainer) -> void:
 			S["bag"] = bid)
 
 
+func stand_preview(box: VBoxContainer, cd: Dictionary) -> void:
+	var svc = SubViewportContainer.new()
+	svc.stretch = true
+	svc.custom_minimum_size = Vector2(0, 240)
+	var vp = SubViewport.new()
+	vp.own_world_3d = true
+	vp.transparent_bg = true
+	vp.size = Vector2i(720, 240)
+	vp.msaa_3d = Viewport.MSAA_4X
+	svc.add_child(vp)
+	var root = Node3D.new()
+	vp.add_child(root)
+	var env = Environment.new()
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color("#9aa6b8")
+	env.ambient_light_energy = 0.8
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	var we = WorldEnvironment.new()
+	we.environment = env
+	root.add_child(we)
+	var sl = DirectionalLight3D.new()
+	sl.rotation_degrees = Vector3(-40, 35, 0)
+	sl.light_energy = 1.3
+	root.add_child(sl)
+	var sl2 = DirectionalLight3D.new()
+	sl2.rotation_degrees = Vector3(-20, -150, 0)
+	sl2.light_energy = 0.5
+	root.add_child(sl2)
+	var cam2 = Camera3D.new()
+	cam2.fov = 30.0
+	root.add_child(cam2)
+	cam2.position = Vector3(0, 2.0, 8.6)
+	cam2.look_at(Vector3(0, 0.75, 0), Vector3.UP)
+	cam2.current = true
+	cyl(3.3, 3.3, 0.06, mat("#1b1d22", 0.4, 0.3), Vector3(0, -0.03, 0), root, 40)
+	var carp = make_proc_car(cd["spec"], cd["col"])
+	carp.rotation.y = 0.6
+	root.add_child(carp)
+	stand_pivot = carp
+	box.add_child(svc)
+	var dims = cd["trunk"]
+	note(box, "%s · %s · %d km/h · resistência %d · mala %d×%d" % [cd["name"].to_upper(), cd["d"], int(float(cd["spd"]) * 3.6), int(cd["hp"]), int(dims[0]), int(dims[1])], true)
+	var hf = HFlowContainer.new()
+	hf.add_theme_constant_override("h_separation", 6)
+	hf.add_theme_constant_override("v_separation", 6)
+	for c in D.CARS:
+		var cid2: String = c["id"]
+		var b = ui_button(c["name"], func():
+			stand_sel = cid2
+			refresh_menu(), "g" if cid2 == cd["id"] else "")
+		b.custom_minimum_size = Vector2(0, 40)
+		b.add_theme_font_size_override("font_size", 17)
+		hf.add_child(b)
+	box.add_child(hf)
+
+
 func menu_stand(box: VBoxContainer) -> void:
+	if stand_sel == "":
+		stand_sel = S["car"]
+	stand_preview(box, find_by_id(D.CARS, stand_sel))
 	note(box, "Tens %s" % fmt(total_money()))
 	h3(box, "Carros")
 	for c in D.CARS:
 		var cid: String = c["id"]
 		var chp: float = c["hp"]
-		buy_row(box, c, S["cars"].has(cid), S["car"] == cid, "%s · %d km/h · resistência %d" % [c["d"], int(c["spd"] * 3.6), c["hp"]], func():
+		buy_row(box, c, S["cars"].has(cid), S["car"] == cid, "%s · %d km/h · mala %d×%d" % [c["d"], int(c["spd"] * 3.6), int(c["trunk"][0]), int(c["trunk"][1])], func():
 			S["cars"].append(cid)
 			S["car"] = cid
 			S["car_hp"] = chp, func():
