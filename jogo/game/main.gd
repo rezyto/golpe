@@ -1276,9 +1276,9 @@ func noisy(img: Image, amount: float, seed_v: int, freq = 0.08) -> void:
 	rng.seed = seed_v
 	var w = img.get_width()
 	var h = img.get_height()
-	var n = int(w * h * 0.004)
+	var n = int(w * h * 0.03)
 	for k in n:
-		var sz = 1 + rng.randi() % maxi(2, int(6.0 * freq / 0.08))
+		var sz = 1 + rng.randi() % 3
 		var x = rng.randi() % w
 		var y = rng.randi() % h
 		var c = img.get_pixel(x, y)
@@ -1424,7 +1424,7 @@ func tex_ground(kind: String) -> StandardMaterial3D:
 			for gx in range(0, 256, 11):
 				var jx = rng.randi() % 3 - 1
 				var jy = rng.randi() % 3 - 1
-				var v = 0.68 + rng.randf() * 0.09
+				var v = 0.6 + rng.randf() * 0.08
 				img.fill_rect(Rect2i(gx + 1 + jx, gy + 1 + jy, 9, 9), Color(v, v * 0.98, v * 0.94))
 		for gx in range(0, 256, 2):
 			var wy = 128 + int(sin(gx * 0.0245) * 70.0)
