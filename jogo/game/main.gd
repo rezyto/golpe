@@ -2595,7 +2595,7 @@ func car_body_mesh(kind: String) -> ArrayMesh:
 		var slope = absf(b[2].y - a[2].y) / maxf(0.001, absf(b[2].x - a[2].x))
 		quad(glass, a[0], b[0], b[1], a[1])
 		quad(glass, a[4], b[4], b[5], a[5])
-		var top_t = glass if slope > 0.45 else paint
+		var top_t = glass if slope > 1.1 else paint
 		quad(top_t, a[1], b[1], b[2], a[2])
 		quad(top_t, a[2], b[2], b[3], a[3])
 		quad(top_t, a[3], b[3], b[4], a[4])
@@ -2629,7 +2629,7 @@ func make_proc_car(kind: String, col: String, police = false) -> Node3D:
 	var body = MeshInstance3D.new()
 	body.mesh = car_body_mesh(kind)
 	body.set_surface_override_material(0, paint_mat(col))
-	var gm = mat("#141a22", 0.08, 0.7)
+	var gm = mat("#3a4c5e", 0.04, 0.85)
 	gm.cull_mode = BaseMaterial3D.CULL_DISABLED
 	body.set_surface_override_material(1, gm)
 	var dm = mat("#151618", 0.8)
