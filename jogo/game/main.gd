@@ -1271,18 +1271,19 @@ var tex_cache = {}
 
 
 func noisy(img: Image, amount: float, seed_v: int, freq = 0.08) -> void:
-	## mistura ruído na imagem para tirar o ar plástico
-	var fn = FastNoiseLite.new()
-	fn.seed = seed_v
-	fn.frequency = freq
-	fn.fractal_octaves = 3
+	## manchas e sujidade (rápido: blocos com fill_rect em vez de píxel a píxel)
+	var rng = RandomNumberGenerator.new()
+	rng.seed = seed_v
 	var w = img.get_width()
 	var h = img.get_height()
-	for y in h:
-		for x in w:
-			var n = fn.get_noise_2d(x, y) * amount
-			var c = img.get_pixel(x, y)
-			img.set_pixel(x, y, Color(clampf(c.r + n, 0, 1), clampf(c.g + n, 0, 1), clampf(c.b + n * 0.9, 0, 1), c.a))
+	var n = int(w * h * 0.004)
+	for k in n:
+		var sz = 1 + rng.randi() % maxi(2, int(6.0 * freq / 0.08))
+		var x = rng.randi() % w
+		var y = rng.randi() % h
+		var c = img.get_pixel(x, y)
+		var dv = (rng.randf() - 0.5) * 2.0 * amount
+		img.fill_rect(Rect2i(x, y, sz, sz), Color(clampf(c.r + dv, 0, 1), clampf(c.g + dv, 0, 1), clampf(c.b + dv * 0.9, 0, 1), c.a))
 
 
 func tri_mat(img: Image, scale_v: Vector3, rough = 0.9) -> StandardMaterial3D:
