@@ -201,6 +201,15 @@ func shots() -> void:
 		await tr.process_frame
 	await tr.create_timer(0.8).timeout
 	await shot("05_cidade_carro")
+	exit_car()
+	for vv in [[60.0, 100.0, 0.6], [150.0, 165.0, 2.4], [300.0, 100.0, -0.8], [205.0, 160.0, 1.57]]:
+		P["x"] = vv[0]
+		P["y"] = vv[1]
+		cam_yaw = vv[2]
+		snap_cam = true
+		await tr.create_timer(0.6).timeout
+		await shot("05b_rua_%d" % int(vv[0]))
+	enter_car()
 	open_fullmap()
 	await shot("06_mapa_cidade")
 	close_fullmap()
@@ -691,28 +700,32 @@ func setup_3d() -> void:
 	var env = Environment.new()
 	var sky = Sky.new()
 	var sm = ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color("#5f86bd")
-	sm.sky_horizon_color = Color("#e3cfae")
+	sm.sky_top_color = Color("#4f7fbf")
+	sm.sky_horizon_color = Color("#d9c7a8")
 	sm.ground_horizon_color = Color("#e3cfae")
 	sm.ground_bottom_color = Color("#3a3a33")
 	sky.sky_material = sm
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.9
+	env.ambient_light_energy = 0.7
+	env.glow_enabled = true
+	env.glow_intensity = 0.4
+	env.glow_bloom = 0.04
+	env.glow_hdr_threshold = 1.1
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.adjustment_enabled = true
 	env.adjustment_contrast = 1.1
 	env.adjustment_saturation = 0.8
 	env.fog_enabled = true
 	env.fog_light_color = Color("#d3c6ae")
-	env.fog_density = 0.0065
+	env.fog_density = 0.0045
 	var we = WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 	sun = DirectionalLight3D.new()
-	sun.light_color = Color("#ffe2b5")
-	sun.light_energy = 1.3
+	sun.light_color = Color("#ffd9a6")
+	sun.light_energy = 1.45
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 55.0
 	sun.rotation_degrees = Vector3(-36, -38, 0)
@@ -1245,6 +1258,361 @@ func place_street_props(r: RandomNumberGenerator) -> void:
 
 
 # =====================================================================
+#  CIDADE COM QUALIDADE: texturas geradas, prédios por andares, ruas
+# =====================================================================
+const FAC_STYLES = [
+	["reboco", "#d9b98c"], ["reboco", "#e6d6c0"], ["reboco", "#c98f74"], ["reboco", "#e8dca8"], ["reboco", "#b9c4c6"],
+	["azulejo", "#2f5d9a"], ["azulejo", "#2f7a6a"], ["tijolo", "#9a4e38"], ["tijolo", "#7d5a48"], ["betao", "#9a9c9e"], ["betao", "#c4c2bc"],
+]
+const SHOP_NAMES = ["MERCEARIA", "BARBEARIA", "LAVANDARIA", "TABACARIA", "SAPATARIA", "PAPELARIA", "TALHO", "FLORISTA", "ÓTICA",
+	"PASTELARIA", "RETROSARIA", "LOJA CHINESA", "QUIOSQUE", "DROGARIA", "PADARIA", "TASCA", "CERVEJARIA", "LIVRARIA", "ELETRODOMÉSTICOS", "OFICINA"]
+const AWNING_COLS = ["#8a2b2b", "#2b5a3a", "#2b3f6a", "#a8742c", "#5a2b4a", "#3a3a3a"]
+var tex_cache = {}
+
+
+func noisy(img: Image, amount: float, seed_v: int, freq = 0.08) -> void:
+	## mistura ruído na imagem para tirar o ar plástico
+	var fn = FastNoiseLite.new()
+	fn.seed = seed_v
+	fn.frequency = freq
+	fn.fractal_octaves = 3
+	var w = img.get_width()
+	var h = img.get_height()
+	for y in h:
+		for x in w:
+			var n = fn.get_noise_2d(x, y) * amount
+			var c = img.get_pixel(x, y)
+			img.set_pixel(x, y, Color(clampf(c.r + n, 0, 1), clampf(c.g + n, 0, 1), clampf(c.b + n * 0.9, 0, 1), c.a))
+
+
+func tri_mat(img: Image, scale_v: Vector3, rough = 0.9) -> StandardMaterial3D:
+	img.generate_mipmaps()
+	var m = StandardMaterial3D.new()
+	m.albedo_texture = ImageTexture.create_from_image(img)
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = scale_v
+	m.roughness = rough
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return m
+
+
+func window_px(img: Image, x: int, y: int, w: int, h: int, frame: Color, lit: bool, rng: RandomNumberGenerator, shutters: Color) -> void:
+	## janela com moldura, vidro em gradiente, travessas e (opcional) portadas
+	if shutters.a > 0.0:
+		var sw = int(w * 0.32)
+		img.fill_rect(Rect2i(x - sw - 2, y, sw, h), shutters)
+		img.fill_rect(Rect2i(x + w + 2, y, sw, h), shutters)
+		for k in range(4, h, 6):
+			img.fill_rect(Rect2i(x - sw - 2, y + k, sw, 1), shutters.darkened(0.25))
+			img.fill_rect(Rect2i(x + w + 2, y + k, sw, 1), shutters.darkened(0.25))
+	img.fill_rect(Rect2i(x - 3, y - 3, w + 6, h + 6), frame)
+	var top = Color("#f3d79a") if lit else Color("#8fa6b8")
+	var bot = Color("#c99a52") if lit else Color("#3d4f60")
+	for k in h:
+		var q = float(k) / h
+		img.fill_rect(Rect2i(x, y + k, w, 1), top.lerp(bot, q))
+	img.fill_rect(Rect2i(x + w / 2 - 1, y, 3, h), frame)
+	img.fill_rect(Rect2i(x, y + h / 3, w, 2), frame)
+	img.fill_rect(Rect2i(x - 5, y + h + 3, w + 10, 4), frame.darkened(0.15))
+	img.fill_rect(Rect2i(x - 5, y - 7, w + 10, 4), frame.darkened(0.15))
+	if not lit and rng.randf() < 0.5:
+		img.fill_rect(Rect2i(x + 2, y + 2, w / 2 - 3, h - 4), Color(0.95, 0.93, 0.85, 0.85))
+
+
+func tex_facade(style: String, col: String) -> StandardMaterial3D:
+	## 256 px = 6 m (2 janelas × 2 andares); janelas centradas em cada andar de 3 m
+	var key = "fac|" + style + "|" + col
+	if tex_cache.has(key):
+		return tex_cache[key]
+	var rng = RandomNumberGenerator.new()
+	rng.seed = hash(key)
+	var img = Image.create(256, 256, false, Image.FORMAT_RGBA8)
+	var base = Color(col)
+	var frame = Color("#f2efe6")
+	var shut = Color(0, 0, 0, 0)
+	if style == "azulejo":
+		img.fill(Color("#eef1f4"))
+		for ty in range(0, 256, 16):
+			for tx in range(0, 256, 16):
+				img.fill_rect(Rect2i(tx, ty, 16, 1), Color("#c9cdd2"))
+				img.fill_rect(Rect2i(tx, ty, 1, 16), Color("#c9cdd2"))
+				img.fill_rect(Rect2i(tx + 7, ty + 3, 3, 10), base)
+				img.fill_rect(Rect2i(tx + 3, ty + 7, 10, 3), base)
+				img.fill_rect(Rect2i(tx + 1, ty + 1, 3, 3), base.lightened(0.2))
+		frame = Color("#e9e4d8")
+	elif style == "tijolo":
+		img.fill(Color("#b8ab98"))
+		for ty in range(0, 256, 8):
+			var off = 0 if (ty / 8) % 2 == 0 else 10
+			for tx in range(-20, 256, 20):
+				var bc = base.darkened(rng.randf() * 0.18).lightened(rng.randf() * 0.08)
+				img.fill_rect(Rect2i(tx + off, ty + 1, 18, 6), bc)
+		frame = Color("#e8e2d4")
+	elif style == "betao":
+		img.fill(base)
+		for ty in range(0, 256, 64):
+			img.fill_rect(Rect2i(0, ty, 256, 3), base.darkened(0.15))
+		frame = Color("#3a3e44")
+	else:
+		img.fill(base)
+		shut = [Color("#2f5a3a"), Color("#6a4a2a"), Color("#3a4a6a"), Color(0, 0, 0, 0)][rng.randi() % 4]
+	noisy(img, 0.05, rng.randi())
+	# cornija de cada andar (simétrica: funciona com a textura em qualquer sentido)
+	if style == "reboco":
+		for ty in [0, 127, 128, 255]:
+			img.fill_rect(Rect2i(0, ty, 256, 1), base.darkened(0.2))
+	for fy in 2:
+		for wx in 2:
+			var big = style == "betao"
+			var w = 70 if big else 44
+			var h = 70 if big else 66
+			var x = wx * 128 + 64 - w / 2
+			var y = fy * 128 + 64 - h / 2
+			window_px(img, x, y, w, h, frame, rng.randf() < 0.18, rng, shut)
+	var m = tri_mat(img, Vector3(1.0 / 6.0, 1.0 / 6.0, 1.0 / 6.0))
+	tex_cache[key] = m
+	return m
+
+
+func tex_shop(col: String) -> StandardMaterial3D:
+	## montra: 256 px = 4 m de largura, 3 m de altura
+	var key = "shop|" + col
+	if tex_cache.has(key):
+		return tex_cache[key]
+	var img = Image.create(256, 192, false, Image.FORMAT_RGBA8)
+	var fr = Color(col).darkened(0.5)
+	img.fill(fr)
+	for k in 150:
+		var q = float(k) / 150.0
+		img.fill_rect(Rect2i(10, 21 + k, 236, 1), Color("#a9c2cf").lerp(Color("#2a3640"), q * 0.9))
+	img.fill_rect(Rect2i(10, 70, 236, 2), fr)
+	img.fill_rect(Rect2i(126, 21, 4, 150), fr)
+	img.fill_rect(Rect2i(30, 120, 60, 40), Color("#d8c9a8"))
+	img.fill_rect(Rect2i(150, 110, 80, 50), Color("#b85a3a"))
+	img.fill_rect(Rect2i(160, 96, 30, 14), Color("#e8b931"))
+	noisy(img, 0.04, hash(col))
+	var m = tri_mat(img, Vector3(0.25, 1.0 / 3.0, 0.25), 0.35)
+	tex_cache[key] = m
+	return m
+
+
+func tex_ground(kind: String) -> StandardMaterial3D:
+	if tex_cache.has(kind):
+		return tex_cache[kind]
+	var rng = RandomNumberGenerator.new()
+	rng.seed = hash(kind)
+	var img = Image.create(256, 256, false, Image.FORMAT_RGBA8)
+	var sc = 0.15
+	var rough = 0.95
+	if kind == "asfalto":
+		img.fill(Color("#3b3d42"))
+		noisy(img, 0.06, 11, 0.2)
+		for k in 260:
+			var c = Color("#5a5c60") if rng.randf() < 0.5 else Color("#2a2c30")
+			img.fill_rect(Rect2i(rng.randi() % 255, rng.randi() % 255, 1 + rng.randi() % 2, 1 + rng.randi() % 2), c)
+		for k in 3:
+			var px = rng.randi() % 220
+			var py = rng.randi() % 220
+			for j in 40:
+				img.fill_rect(Rect2i(px + j, py + int(sin(j * 0.3) * 4.0), 1, 1), Color("#26282c"))
+		sc = 1.0 / 7.0
+	elif kind == "calcada":
+		img.fill(Color("#8f8b82"))
+		for gy in range(0, 256, 11):
+			for gx in range(0, 256, 11):
+				var jx = rng.randi() % 3 - 1
+				var jy = rng.randi() % 3 - 1
+				var v = 0.86 + rng.randf() * 0.1
+				img.fill_rect(Rect2i(gx + 1 + jx, gy + 1 + jy, 9, 9), Color(v, v * 0.985, v * 0.95))
+		for gx in range(0, 256, 2):
+			var wy = 128 + int(sin(gx * 0.049) * 40.0)
+			for k in 3:
+				img.fill_rect(Rect2i(gx, wy + k * 11, 2, 9), Color("#2a2a2c"))
+		sc = 1.0 / 3.0
+		rough = 0.8
+	elif kind == "relva":
+		img.fill(Color("#5b7a45"))
+		noisy(img, 0.12, 21, 0.06)
+		for k in 900:
+			img.fill_rect(Rect2i(rng.randi() % 256, rng.randi() % 256, 1, 2), Color("#7a9a58") if rng.randf() < 0.5 else Color("#466234"))
+		sc = 1.0 / 5.0
+	elif kind == "praca":
+		img.fill(Color("#a39a88"))
+		for gy in range(0, 256, 32):
+			for gx in range(0, 256, 32):
+				var v2 = 0.6 + rng.randf() * 0.1
+				img.fill_rect(Rect2i(gx + 1, gy + 1, 30, 30), Color(v2, v2 * 0.96, v2 * 0.9))
+		noisy(img, 0.04, 31)
+		sc = 1.0 / 4.0
+	var m = tri_mat(img, Vector3(sc, sc, sc), rough)
+	tex_cache[kind] = m
+	return m
+
+
+func place_proc_building(b: Dictionary, parent: Node3D, xf: Dictionary) -> void:
+	## prédio por andares: rés-do-chão com montra, andares com janelas, cornija, telhado com detalhes
+	var w: float = b["w"]
+	var d: float = b["h"]
+	var r = RandomNumberGenerator.new()
+	r.seed = hash("%.1f,%.1f" % [b["x"], b["y"]])
+	var floors = clampi(int(round((float(b["hgt"]) - 3.0) / 3.0)), 1, 6)
+	var st = FAC_STYLES[r.randi() % FAC_STYLES.size()]
+	var top = 3.0 + floors * 3.0
+	b["hgt"] = top + 0.6
+	var cx: float = b["x"] + w / 2.0
+	var cz: float = b["y"] + d / 2.0
+	var face = int(b.get("face", 1))
+	var fz: float = b["y"] + d if face > 0 else b["y"]
+	var out = 1.0 if face > 0 else -1.0
+	var vis = 230.0
+	var shop_col = AWNING_COLS[r.randi() % AWNING_COLS.size()]
+	var shop = box(Vector3(w, 2.75, d), tex_shop(shop_col), Vector3(cx, 1.625, cz), parent)
+	shop.visibility_range_end = vis
+	var body = box(Vector3(w, top - 3.0, d), tex_facade(st[0], st[1]), Vector3(cx, 3.0 + (top - 3.0) / 2.0, cz), parent)
+	body.visibility_range_end = vis + 60.0
+	var trim = mat("#e9e4d8") if st[0] != "betao" else mat("#6a6e74")
+	var c1 = box(Vector3(w + 0.25, 0.22, d + 0.25), trim, Vector3(cx, 3.0, cz), parent, false)
+	c1.visibility_range_end = vis
+	var c2 = box(Vector3(w + 0.35, 0.4, d + 0.35), trim, Vector3(cx, top + 0.2, cz), parent)
+	c2.visibility_range_end = vis + 60.0
+	box(Vector3(w - 0.4, 0.1, d - 0.4), mat("#55585e"), Vector3(cx, top + 0.42, cz), parent, false)
+	# letreiro e toldo da loja
+	if r.randf() < 0.75:
+		var lab = Label3D.new()
+		lab.text = SHOP_NAMES[r.randi() % SHOP_NAMES.size()]
+		lab.font = get_font()
+		lab.font_size = 52
+		lab.pixel_size = 0.01
+		lab.outline_size = 0
+		lab.modulate = Color("#f4efe2")
+		lab.position = Vector3(cx, 2.86, fz + out * 0.04)
+		lab.rotation.y = 0.0 if face > 0 else PI
+		lab.visibility_range_end = 70.0
+		parent.add_child(lab)
+		box(Vector3(minf(w * 0.7, 6.0), 0.36, 0.06), mat(shop_col), Vector3(cx, 2.86, fz + out * 0.01), parent, false)
+	if r.randf() < 0.45:
+		var aw = box(Vector3(w * 0.85, 0.08, 1.1), mat(shop_col, 0.9), Vector3(cx, 2.55, fz + out * 0.55), parent)
+		aw.rotation.x = -0.2 * out
+		aw.visibility_range_end = vis
+	# varandas (instâncias partilhadas)
+	if st[0] != "betao" and r.randf() < 0.6:
+		var x0 = ceil((b["x"] + 0.9 - 1.5) / 3.0) * 3.0 + 1.5
+		var xx = x0
+		while xx < b["x"] + w - 0.9:
+			for fl in floors:
+				var by = 3.0 + fl * 3.0 + 0.7
+				xf["bal"].append(Transform3D(Basis(), Vector3(xx, by, fz + out * 0.35)))
+				xf["rail"].append(Transform3D(Basis(), Vector3(xx, by + 0.5, fz + out * 0.68)))
+			xx += 3.0
+	# telhado: ar condicionado, depósitos, antenas
+	for k in r.randi_range(1, 3):
+		xf["ac"].append(Transform3D(Basis(Vector3.UP, r.randf() * 0.3), Vector3(b["x"] + 1.0 + r.randf() * maxf(0.1, w - 2.0), top + 0.85, b["y"] + 1.0 + r.randf() * maxf(0.1, d - 2.0))))
+	if r.randf() < 0.35:
+		xf["tank"].append(Transform3D(Basis(), Vector3(cx + (r.randf() - 0.5) * w * 0.5, top + 1.3, cz + (r.randf() - 0.5) * d * 0.5)))
+	if r.randf() < 0.3:
+		xf["ant"].append(Transform3D(Basis(), Vector3(cx, top + 2.0, cz)))
+
+
+func flush_city_instances(xf: Dictionary, parent: Node3D) -> void:
+	var bal = BoxMesh.new()
+	bal.size = Vector3(1.9, 0.12, 0.75)
+	mm_add(parent, bal, mat("#d9d4c8"), xf["bal"])
+	var rail = BoxMesh.new()
+	rail.size = Vector3(1.9, 0.95, 0.05)
+	var rm = mat("#2a2c30", 0.4, 0.6)
+	mm_add(parent, rail, rm, xf["rail"], false)
+	var ac = BoxMesh.new()
+	ac.size = Vector3(1.2, 0.9, 0.9)
+	mm_add(parent, ac, mat("#b8bcc2", 0.5, 0.4), xf["ac"])
+	var tank = CylinderMesh.new()
+	tank.top_radius = 0.9
+	tank.bottom_radius = 0.9
+	tank.height = 1.6
+	tank.radial_segments = 10
+	mm_add(parent, tank, mat("#8a8f96", 0.5, 0.5), xf["tank"])
+	var ant = CylinderMesh.new()
+	ant.top_radius = 0.03
+	ant.bottom_radius = 0.05
+	ant.height = 3.0
+	ant.radial_segments = 4
+	mm_add(parent, ant, rm, xf["ant"], false)
+
+
+func build_streets(parent: Node3D) -> void:
+	## lancis, linhas laterais e tampas de esgoto
+	var rw: float = Z["rw"]
+	var W: float = Z["w"]
+	var city = Z["kind"] == "city"
+	var vmax = 254.0 if city else float(Z["h"])
+	var curb = []
+	for l in Z["lots"]:
+		if l["kind"] == "beach":
+			continue
+		var cx: float = l["x"] + l["w"] / 2.0
+		var cz: float = l["y"] + l["h"] / 2.0
+		curb.append(Transform3D(Basis().scaled(Vector3(l["w"], 1, 1)), Vector3(cx, 0.15, l["y"] + 0.12)))
+		curb.append(Transform3D(Basis().scaled(Vector3(l["w"], 1, 1)), Vector3(cx, 0.15, l["y"] + l["h"] - 0.12)))
+		curb.append(Transform3D(Basis(Vector3.UP, PI / 2).scaled(Vector3(l["h"], 1, 1)), Vector3(l["x"] + 0.12, 0.15, cz)))
+		curb.append(Transform3D(Basis(Vector3.UP, PI / 2).scaled(Vector3(l["h"], 1, 1)), Vector3(l["x"] + l["w"] - 0.12, 0.15, cz)))
+	var cm = BoxMesh.new()
+	cm.size = Vector3(1.0, 0.3, 0.26)
+	mm_add(parent, cm, mat("#b9b6ae", 0.8), curb, false)
+	var edge = []
+	for y in Z["ry"]:
+		for side in [-1.0, 1.0]:
+			edge.append(Transform3D(Basis().scaled(Vector3(W + 300, 1, 1)), Vector3(W / 2.0, 0.026, y + side * (rw - 0.45))))
+	for x in Z["rx"]:
+		for side in [-1.0, 1.0]:
+			edge.append(Transform3D(Basis(Vector3.UP, PI / 2).scaled(Vector3(vmax + 200, 1, 1)), Vector3(x + side * (rw - 0.45), 0.028, (vmax - 200.0) / 2.0)))
+	var em = BoxMesh.new()
+	em.size = Vector3(1.0, 0.01, 0.14)
+	mm_add(parent, em, mat("#e6e3da"), edge, false)
+	var holes = []
+	var rr = RandomNumberGenerator.new()
+	rr.seed = hash(Z["id"]) + 5
+	for k in (40 if city else 10):
+		if rr.randf() < 0.5:
+			holes.append(Transform3D(Basis(), Vector3(8.0 + rr.randf() * (W - 16.0), 0.03, Z["ry"][rr.randi() % Z["ry"].size()] + (rr.randf() - 0.5) * rw)))
+		else:
+			holes.append(Transform3D(Basis(), Vector3(Z["rx"][rr.randi() % Z["rx"].size()] + (rr.randf() - 0.5) * rw, 0.03, 8.0 + rr.randf() * (vmax - 16.0))))
+	var hm = CylinderMesh.new()
+	hm.top_radius = 0.38
+	hm.bottom_radius = 0.38
+	hm.height = 0.02
+	hm.radial_segments = 14
+	mm_add(parent, hm, mat("#26282b", 0.5, 0.6), holes, false)
+
+
+func build_skyline(parent: Node3D) -> void:
+	## prédios ao longe, para a cidade não acabar no vazio
+	var W: float = Z["w"]
+	var H: float = Z["h"]
+	var rr = RandomNumberGenerator.new()
+	rr.seed = 909
+	var far = mat("#7d8590", 1.0)
+	var far2 = mat("#8a8f96", 1.0)
+	var xs = []
+	for k in 70:
+		var side = rr.randi() % 3
+		var px = 0.0
+		var pz = 0.0
+		if side == 0:
+			px = -40.0 - rr.randf() * 90.0
+			pz = rr.randf() * minf(H, 250.0)
+		elif side == 1:
+			px = W + 40.0 + rr.randf() * 90.0
+			pz = rr.randf() * minf(H, 250.0)
+		else:
+			px = rr.randf() * W
+			pz = -40.0 - rr.randf() * 90.0
+		var hh = 10.0 + rr.randf() * 35.0
+		var bw = 10.0 + rr.randf() * 18.0
+		var m = box(Vector3(bw, hh, bw), far if k % 2 == 0 else far2, Vector3(px, hh / 2.0, pz), parent, false)
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+# =====================================================================
 #  GERAÇÃO: ZONAS PEQUENAS (casa, bar) E CIDADE
 # =====================================================================
 func base_zone(id: String, w: float, h: float, rw: float, rx: Array, ry: Array) -> Dictionary:
@@ -1552,7 +1920,7 @@ func build_world() -> void:
 	var pm = PlaneMesh.new()
 	pm.size = Vector2(W + 400, H + 400)
 	ground.mesh = pm
-	ground.material_override = mat("#4b6640")
+	ground.material_override = tex_ground("relva")
 	ground.position = Vector3(W / 2.0, -0.02, H / 2.0)
 	world.add_child(ground)
 	# água
@@ -1571,11 +1939,12 @@ func build_world() -> void:
 		if l["kind"] == "beach":
 			box(Vector3(l["w"], 0.2, l["h"] + 2.0), mat("#c9b27e"), Vector3(lcx, 0.08, lcz + 1.0), world, false)
 			continue
-		box(Vector3(l["w"], 0.25, l["h"]), mat("#a8a398"), Vector3(lcx, 0.125, lcz), world, false)
-		var inner = mat("#6a6152") if l["kind"] == "plaza" else mat("#587a48")
-		box(Vector3(maxf(0.5, l["w"] - 2.0), 0.27, maxf(0.5, l["h"] - 2.0)), inner, Vector3(lcx, 0.135, lcz), world, false)
+		box(Vector3(l["w"], 0.25, l["h"]), tex_ground("calcada"), Vector3(lcx, 0.125, lcz), world, false)
+		if l["kind"] == "plaza" or not city:
+			var inner = tex_ground("praca") if l["kind"] == "plaza" else tex_ground("relva")
+			box(Vector3(maxf(0.5, l["w"] - 3.0), 0.27, maxf(0.5, l["h"] - 3.0)), inner, Vector3(lcx, 0.135, lcz), world, false)
 	# estradas
-	var asphalt = mat("#2f3238", 0.95)
+	var asphalt = tex_ground("asfalto")
 	var vmax = 254.0 if city else H + 200.0
 	for y in Z["ry"]:
 		box(Vector3(W + 400, 0.04, rw * 2.0), asphalt, Vector3(W / 2.0, 0.0, y), world, false)
@@ -1620,7 +1989,10 @@ func build_world() -> void:
 				cross.append(Transform3D(Basis().scaled(Vector3(0.7, 1, 0.35)), Vector3(xr + rw + 1.2, 0.03, yr + k * 1.2)))
 	var dm = BoxMesh.new()
 	dm.size = Vector3(1.8, 0.02, 0.22)
-	mm_add(world, dm, mat("#e4d27a"), dash, false)
+	mm_add(world, dm, mat("#e6e3da"), dash, false)
+	build_streets(world)
+	if city:
+		build_skyline(world)
 	var cm = BoxMesh.new()
 	cm.size = Vector3(2.4, 0.02, 0.9)
 	mm_add(world, cm, mat("#e9e6dc"), cross, false)
@@ -1672,6 +2044,7 @@ func build_world() -> void:
 	mm_add(world, bmesh, unshaded(Color("#fff1c2")), bulbs, false)
 	# prédios
 	var use_models = has_models()
+	var cxf = {"bal": [], "rail": [], "ac": [], "tank": [], "ant": []}
 	for b in Z["blocks"]:
 		if b.get("water", false) or b.get("car", false):
 			continue
@@ -1684,10 +2057,10 @@ func build_world() -> void:
 			var cr = box(Vector3(w, hgt, d), mat("#7a5f3c"), Vector3(bcx, hgt / 2.0 + 0.25, bcz), world)
 			cr.visibility_range_end = vis
 			continue
-		if not b.get("main", false) and use_models:
-			place_kaykit_building(b, world)
+		if not b.get("main", false):
+			place_proc_building(b, world, cxf)
 			continue
-		var body = box(Vector3(w, hgt, d), facade(b["col"]), Vector3(bcx, hgt / 2.0 + 0.25, bcz), world)
+		var body = box(Vector3(w, hgt, d), tex_facade("reboco", b["col"]), Vector3(bcx, hgt / 2.0 + 0.25, bcz), world)
 		body.visibility_range_end = vis + 60.0
 		var roofc = Color(b["col"]).darkened(0.35)
 		var roof = box(Vector3(w + 0.3, 0.35, d + 0.3), mat("#" + roofc.to_html(false)), Vector3(bcx, hgt + 0.42, bcz), world)
@@ -1713,6 +2086,7 @@ func build_world() -> void:
 	for q in Z["parked"]:
 		var pcar = make_simple_car(q["col"], world, Vector3(q["cx"], 0, q["cy"]), q["ang"])
 		set_vis_range(pcar, vis)
+	flush_city_instances(cxf, world)
 	# árvores (multimesh)
 	var trunks = []
 	var leaves = []
