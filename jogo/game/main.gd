@@ -4427,7 +4427,7 @@ func grid_add(items: Array, cols: int, rows: int, st: Dictionary) -> int:
 	return (int(st["v"]) if is_cash else int(st.get("q", 1))) - left
 
 
-func grid_pack(list: Array, cols: int, rows: int):
+func grid_pack(list: Array, cols: int, rows: int) -> Variant:
 	## volta a arrumar tudo numa grelha (maiores primeiro); null se não couber
 	var sorted = list.duplicate()
 	sorted.sort_custom(func(a, b): return item_size(a["id"]).x * item_size(a["id"]).y > item_size(b["id"]).x * item_size(b["id"]).y)

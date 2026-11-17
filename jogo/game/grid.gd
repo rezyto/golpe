@@ -44,7 +44,7 @@ func item_rect(it: Dictionary) -> Rect2:
 	return Rect2(Vector2(it["x"], it["y"]) * cell + Vector2(GAP, GAP), Vector2(sz.x, sz.y) * cell - Vector2(GAP, GAP) * 2.0)
 
 
-func item_at(pos: Vector2):
+func item_at(pos: Vector2) -> Variant:
 	for it in items:
 		if item_rect(it).grow(GAP).has_point(pos):
 			return it
@@ -124,7 +124,7 @@ func _gui_input(e: InputEvent) -> void:
 
 
 func _get_drag_data(at: Vector2):
-	var it = item_at(at)
+	var it: Variant = item_at(at)
 	if it == null or it.get("hid", false):
 		return null
 	_press_item = null
