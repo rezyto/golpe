@@ -103,8 +103,13 @@ def fetch_hdris():
     assets = jget(PH + "/assets?t=hdris")
     used = set()
     for role, (cats, tags) in HDRI_ROLES.items():
-        cand = {k: v for k, v in assets.items() if k not in used and any(c in [x.lower() for x in v.get("categories", [])] for c in cats)}
-        aid = pick(cand, [""], [t for t in tags]) or pick(cand, [""])
+        pref = {"dia": ["kloofendal_48d_partly_cloudy_puresky", "kloofendal_43d_clear_puresky", "kloofendal_48d_partly_cloudy"],
+                "tarde": ["qwantani_dusk_2_puresky", "kloofendal_misty_morning_puresky", "venice_sunset"],
+                "noite": ["kloppenheim_02_puresky", "satara_night", "moonless_golf"]}[role]
+        aid = next((x for x in pref if x in assets and x not in used), None)
+        if not aid:
+            cand = {k: v for k, v in assets.items() if k not in used and any(c in [x.lower() for x in v.get("categories", [])] for c in cats)}
+            aid = pick(cand, [""], [t for t in tags]) or pick(cand, [""])
         if not aid:
             continue
         used.add(aid)
@@ -141,10 +146,10 @@ def fetch_models(limit=24):
 # ---------------------------------------------------------------- Sons (OpenGameArt, CC0)
 OGA_PAGES = {
     "armas": "https://opengameart.org/content/the-free-firearm-sound-library",
-    "impactos": "https://opengameart.org/content/impact-sounds",
-    "interface": "https://opengameart.org/content/interface-sounds",
-    "rpg": "https://opengameart.org/content/rpg-sound-pack",
-    "passos": "https://opengameart.org/content/footsteps-sounds",
+    "impactos": "https://kenney.nl/assets/impact-sounds",
+    "interface": "https://kenney.nl/assets/interface-sounds",
+    "rpg": "https://kenney.nl/assets/rpg-audio",
+    "ui": "https://kenney.nl/assets/ui-audio",
 }
 
 
@@ -156,11 +161,16 @@ def fetch_sounds():
             print("falhou página", page, e)
             continue
         links = sorted(set(re.findall(r'https://opengameart\.org/sites/default/files/[^"\']+\.(?:zip|7z|ogg|wav)', html)))
+        links += sorted(set(re.findall(r'https://kenney\.nl/media/[^"\']+\.zip', html)))
         if not links:
             print("sem ficheiros em", page)
             continue
         url = links[0]
-        data = get(url.replace(" ", "%20"))
+        try:
+            data = get(url.replace(" ", "%20"))
+        except Exception as e:
+            print("falhou ficheiro", url, e)
+            continue
         dest = f"{OUT}/raw_snd/{role}"
         os.makedirs(dest, exist_ok=True)
         fn = os.path.join(dest, os.path.basename(url).replace("%20", "_"))
@@ -200,6 +210,9 @@ def curate_sounds(per_role=4):
             if f.lower().endswith((".wav", ".ogg", ".mp3", ".flac")):
                 files.append(os.path.join(root, f))
     files.sort()
+    print("ficheiros de som:", len(files))
+    for fp in files[::max(1, len(files) // 60)]:
+        print("  ", fp[len(raw):])
     os.makedirs(f"{OUT}/snd", exist_ok=True)
     for role, words in SND_ROLES.items():
         n = 0
@@ -207,7 +220,7 @@ def curate_sounds(per_role=4):
             name = fp.lower().replace("\\", "/")
             if role == "ui" and "/interface/" not in name:
                 continue
-            if not any(w in os.path.basename(name) or w in name.split("/")[-2] for w in words):
+            if not any(w in name[len(raw):] for w in words):
                 continue
             dst = f"{OUT}/snd/{role}_{n}.ogg"
             r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", fp, "-ac", "1", "-ar", "44100", "-t", "4", "-c:a", "libvorbis", "-q:a", "3", dst])
