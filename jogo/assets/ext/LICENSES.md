@@ -41,4 +41,10 @@
 | modelo | Rockingchair_01 | https://polyhaven.com/a/Rockingchair_01 | CC0 |
 | modelo | wooden_picnic_table | https://polyhaven.com/a/wooden_picnic_table | CC0 |
 | modelo | boombox | https://polyhaven.com/a/boombox | CC0 |
-| sons armas | Prepared%20SFX%20Library.7z | https://opengameart.org/content/the-free-firearm-sound-library | CC0 |
+| sons armas | Prepared SFX Library.7z, ak47.ogg, ak47.ogg, ak47.ogg, ak47.ogg | https://opengameart.org/content/the-free-firearm-sound-library | CC0 |
+| sons passos | Fantozzi-footsteps.7z, fallfantozi.ogg, fallfantozi.ogg, fallfantozi.ogg, fallfantozi.ogg | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone | CC0 |
+| sons geral | Owlish Media Sound Effects.zip, Samples.mp3.ogg | https://opengameart.org/node/86682 | CC0 |
+| sons portas | montage-sfx-20121116%40113925.ogg, montage-sfx-20121116%40113925.ogg, qubodup-DoorSet.7z, montage-sfx-20121116%40113925.ogg, montage-sfx-20121116%40113925.ogg | https://opengameart.org/content/door-open-door-close-set | CC0 |
+| sons interface | UI_SFX_Set.zip, sfxguipreview.mp3.ogg | https://opengameart.org/content/51-ui-sound-effects-buttons-switches-and-clicks | CC0 |
+| sons socos | hit.mp3.ogg, independent_nu_ljudbank-hits_and_punches.7z | https://opengameart.org/content/37-hitspunches | CC0 |
+| sons choque | qubodup-crash.mp3.ogg, qubodup-crash.ogg | https://opengameart.org/content/crash-collision | CC0 |
