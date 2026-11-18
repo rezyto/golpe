@@ -46,6 +46,7 @@ const PROPS := [
 ## catálogo de itens: nome, categoria, peso (kg), valor. O ícone é res://game/icons/<id>.png
 const ITEMS := {
 	"cash": {"n": "Dinheiro", "cat": "dinheiro", "kg": 0.0, "v": 0, "sz": [1, 1], "max": 25000},
+	"sujo": {"n": "Notas marcadas", "cat": "dinheiro", "kg": 0.0, "v": 0, "sz": [1, 1], "max": 25000},
 	"relogio": {"n": "Relógio de ouro", "cat": "joias", "kg": 0.2, "v": 6000, "sz": [1, 1], "max": 3},
 	"anel": {"n": "Anel de diamante", "cat": "joias", "kg": 0.05, "v": 12000, "sz": [1, 1], "max": 5},
 	"colar": {"n": "Colar de pérolas", "cat": "joias", "kg": 0.1, "v": 8000, "sz": [1, 1], "max": 2},
@@ -102,6 +103,7 @@ const SHOPS := {
 	"armeiro": {"name": "Armeiro do Lima", "col": "#5d5862", "lvl": 1},
 	"stand": {"name": "Stand Rodas Livres", "col": "#a8742c", "lvl": 1},
 	"imob": {"name": "Imobiliária Chave d'Ouro", "col": "#7c6a3a", "lvl": 1},
+	"lavandaria": {"name": "Lavandaria Bolha", "col": "#3d6f8e", "lvl": 1},
 }
 
 const BPAL := ["#6b6f7a", "#7a6a5a", "#5d6b78", "#8a7f6a", "#6a5a6e", "#5f7466", "#857066", "#6e7580", "#9a8b74", "#71808a"]
@@ -117,7 +119,7 @@ const REGION := [
 const CITY_CELLS := {
 	"2,1": "cafe", "1,2": "hotel", "2,2": "museu", "4,1": "bomba", "1,3": "armeiro",
 	"5,1": "stand", "4,2": "imob", "2,3": "t_velho", "5,3": "t_docas", "5,2": "t_ind",
-	"1,1": "joalharia", "4,3": "farmacia", "6,1": "garrafeira", "6,2": "banco",
+	"1,1": "joalharia", "4,3": "farmacia", "6,1": "garrafeira", "6,2": "banco", "6,3": "lavandaria",
 }
 
 const DISTRICTS := [
@@ -128,10 +130,22 @@ const DISTRICTS := [
 const ICONS := {
 	"cafe": ["C", "#e0483e"], "bomba": ["B", "#e0483e"], "hotel": ["H", "#e0483e"], "museu": ["M", "#e0483e"],
 	"farmacia": ["F", "#e0483e"], "garrafeira": ["G", "#e0483e"], "joalharia": ["J", "#e0483e"], "banco": ["$", "#e0483e"],
-	"armeiro": ["A", "#e8b931"], "stand": ["S", "#e8b931"], "imob": ["I", "#e8b931"],
+	"armeiro": ["A", "#e8b931"], "stand": ["S", "#e8b931"], "imob": ["I", "#e8b931"], "lavandaria": ["L", "#e8b931"],
+	"venda": ["v", "#d0d4da"], "mb": ["€", "#5aa0e0"],
 	"t_docas": ["T", "#9a6ad0"], "t_velho": ["T", "#9a6ad0"], "t_ind": ["T", "#9a6ad0"],
 	"van": ["V", "#3cc48a"],
 }
+
+## máquinas de rua: lucro rápido, mas o multibanco dispara alarme e atrai rivais
+const STREET := {
+	"venda": {"n": "Máquina de venda", "tool": "pe_cabra", "need": 4.0, "cd": 12, "dims": [4, 3],
+		"loot": [{"cash": [100, 700]}, {"id": "energeticas", "ch": 0.9, "q": [2, 5]}, {"id": "bolo", "ch": 0.4, "q": [1, 2]}, {"id": "tabaco", "ch": 0.3, "q": [1, 3]}]},
+	"mb": {"n": "Multibanco", "tool": "berbequim", "need": 9.0, "cd": 20, "dims": [4, 3],
+		"loot": [{"sujo": [4000, 12000]}, {"sujo": [2000, 6000]}]},
+}
+const WASH_FEE := 0.25
+const WASH_MAX := 60000
+const WASH_MIN_PER_10K := 1.0   # minutos de espera por cada 10 000 lavados
 
 ## carrinhas de receptação: sítios possíveis [x, rua (y), lado] e tipos
 const VAN_SPOTS := [[60.0, 95.0, -1.0], [130.0, 160.0, 1.0], [285.0, 95.0, 1.0], [350.0, 160.0, -1.0], [120.0, 225.0, 1.0], [300.0, 225.0, 1.0], [60.0, 30.0, 1.0], [340.0, 30.0, 1.0]]

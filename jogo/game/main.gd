@@ -356,6 +356,40 @@ func shots() -> void:
 		close_loot()
 		await tr.create_timer(0.3).timeout
 		await shot("23_dinheiro_na_mesa")
+	# máquinas de rua
+	S["tools"].append("pe_cabra")
+	S["tools"].append("berbequim")
+	for kind in ["venda", "mb"]:
+		for pp in Z["pois"]:
+			if pp["kind"] == kind:
+				P["x"] = pp["mx"] + 1.2
+				P["y"] = pp["my"] - 3.2
+				cam_yaw = PI
+				snap_cam = true
+				await tr.create_timer(0.8).timeout
+				await shot("23%s_maquina_%s" % ["b" if kind == "venda" else "c", kind])
+				if kind == "mb":
+					P["x"] = pp["x"]
+					P["y"] = pp["y"]
+					start_street(pp)
+					await tr.create_timer(0.6).timeout
+					await shot("23d_a_perfurar_mb")
+					search["t"] = 999.0
+					await tr.create_timer(2.5).timeout
+					await shot("23e_saque_mb")
+					for it in loot_c.get("items", []).duplicate():
+						it["hid"] = false
+						quick_move(paneL["grid"], paneR["grid"], it)
+					close_loot()
+					wanted = 0
+					for g in gang:
+						g["mesh"].queue_free()
+					gang = []
+				break
+	open_shop("lavandaria")
+	await tr.create_timer(0.3).timeout
+	await shot("23f_lavandaria")
+	close_menu()
 	enter_place("bar")
 	await tr.create_timer(0.8).timeout
 	open_shop("bar")
@@ -493,6 +527,47 @@ func autotest() -> void:
 	quick_move(paneR["grid"], paneL["grid"], S["inv"][S["inv"].size() - 1])
 	close_loot()
 	print("autotest: mala modo ", tmode, " itens na mala ", S["trunks"].get(S["car"], []).size())
+	# máquinas de rua + notas marcadas + lavandaria
+	S["tools"].append("pe_cabra")
+	S["tools"].append("berbequim")
+	var nm = {"venda": 0, "mb": 0}
+	for pp in Z["pois"]:
+		if pp["kind"] in ["venda", "mb"]:
+			nm[pp["kind"]] += 1
+	for kind in ["venda", "mb"]:
+		for pp in Z["pois"]:
+			if pp["kind"] == kind:
+				P["x"] = pp["x"]
+				P["y"] = pp["y"]
+				await tr.process_frame
+				var lab = ctx_action().get("l", "")
+				do_action()
+				if not search.is_empty():
+					search["t"] = 999.0
+				await tr.process_frame
+				await tr.process_frame
+				var got = []
+				if mode == "loot":
+					for it in loot_c["items"]:
+						it["hid"] = false
+						got.append(it["id"])
+					var cc = loot_c
+					for it in cc["items"].duplicate():
+						quick_move(paneL["grid"], paneR["grid"], it)
+					close_loot()
+				print("autotest: rua ", kind, " (", nm[kind], " no mapa) botao ", lab.replace("\n", " "), " loot ", got, " depois ", ctx_action().get("l", "").replace("\n", " "))
+				break
+	wanted = 0
+	var dz = dirty_cash()
+	open_shop("lavandaria")
+	await tr.process_frame
+	if dz > 0:
+		take_dirty(dz)
+		S["wash"].append({"amt": dz, "net": int(dz * 0.75), "ready": now_ms() - 1.0})
+	refresh_menu()
+	await tr.process_frame
+	close_menu()
+	print("autotest: sujo ", dz, " em lavagem ", S["wash"].size())
 	open_shop("stand")
 	await tr.process_frame
 	stand_sel = "furia"
@@ -577,7 +652,7 @@ func now_ms() -> float:
 func default_save() -> Dictionary:
 	return {"ver": 4, "trunks": {}, "story": 0, "paid": 0, "tools": [], "ties": 0, "nick": "", "money": 5000, "xp": 0, "lvl": 1, "hp": 100.0, "weapon": "p22", "weapons": ["p22"],
 		"car": "pardal", "cars": ["pardal"], "car_hp": 100.0, "bag": "b10", "bags": ["b10"], "props": {}, "terr": {},
-		"inv": [], "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
+		"inv": [], "wash": [], "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
 		"stats": {"heists": 0, "busted": 0, "earned": 0, "hospital": 0}}
 
 
@@ -1791,6 +1866,30 @@ func poi_building(z: Dictionary, id: String, bx: float, by: float, bw: float, bh
 		z["trees"].append({"x": tx2, "y": by + 1.5 + r.randf() * maxf(1.0, ty - by - 3.0), "r": 1.0 + r.randf() * 0.8})
 
 
+func place_street_machines(z: Dictionary, r: RandomNumberGenerator, rx: Array, ry: Array, rw: float, cx0: float, cw: float) -> void:
+	## máquinas de venda e multibancos encostados aos prédios, virados para a rua
+	var spots = []
+	for yi in ry.size() - 1:
+		var y: float = ry[yi]
+		for k in 9:
+			var x = 12.0 + k * 46.0 + r.randf_range(-6.0, 6.0)
+			var near_cross = false
+			for xr in rx:
+				if absf(x - xr) < rw + 7.0:
+					near_cross = true
+			if near_cross or (x > cx0 - 6.0 and x < cx0 + cw + 6.0) or x > 410.0:
+				continue
+			spots.append(Vector2(x, y))
+	var n = 0
+	for v in spots:
+		if r.randf() > 0.55:
+			continue
+		var kind = "mb" if n % 3 == 1 else "venda"
+		var my = v.y + rw + 1.25
+		z["pois"].append({"id": "m%d" % n, "kind": kind, "x": v.x, "y": my - 1.15, "mx": v.x, "my": my, "name": D.STREET[kind]["n"]})
+		n += 1
+
+
 func make_small(id: String) -> Dictionary:
 	var r = RandomNumberGenerator.new()
 	r.seed = hash(id)
@@ -1848,6 +1947,7 @@ func make_city() -> Dictionary:
 	z["blocks"].append({"x": cx0, "y": a, "w": cw, "h": 254.0 - a, "hgt": -1.0, "water": true})
 	z["blocks"].append({"x": -60.0, "y": 256.0, "w": 540.0, "h": 90.0, "hgt": -1.0, "water": true})
 	z["lots"].append({"x": 0.0, "y": ry[3] + rw, "w": 420.0, "h": 254.0 - ry[3] - rw, "kind": "beach"})
+	place_street_machines(z, r, rx, ry, rw, cx0, cw)
 	for i in xs.size():
 		for j in ys.size():
 			var subs = []
@@ -2248,6 +2348,8 @@ func build_world() -> void:
 			box(Vector3(0.6, 0.12, 0.3), unshaded(Color("#fff1c2")), Vector3(p["x"], 2.75, wz - 0.18), world, false)
 			box(Vector3(2.0, 0.08, 1.2), mat("#4a4d52"), Vector3(p["x"], 0.28, wz - 0.7), world, false)
 			model_inst("dumpster", Vector3.ONE * 4.0, 0.0, world, Vector3(p["x"] + 3.2, 0.25, wz - 1.2), 120.0)
+		elif p["kind"] in ["venda", "mb"]:
+			build_street_machine(p)
 		elif p["kind"] == "alarm":
 			var wz2: float = p["wy"]
 			box(Vector3(0.6, 0.8, 0.12), mat("#e6e8ea", 0.4, 0.2), Vector3(p["x"], 1.6, wz2 - 0.06), world)
@@ -2257,6 +2359,32 @@ func build_world() -> void:
 			box(Vector3(0.08, 1.2, 0.08), mat("#3a3a3a"), Vector3(p["x"] - 0.24, 0.85, wz2 - 0.1), world, false)
 		else:
 			rings.append(make_ring(Vector3(p["x"], 0.35, p["y"]), 1.2, 1.55, RED if p["kind"] == "heist" else GOLD))
+
+
+func build_street_machine(p: Dictionary) -> void:
+	var g = Node3D.new()
+	g.position = Vector3(p["mx"], 0, p["my"])
+	g.rotation.y = PI  # frente virada para a rua (norte)
+	world.add_child(g)
+	if p["kind"] == "venda":
+		var cols = ["#b3262b", "#1f5fa8", "#2a7a3e", "#d08a1a"]
+		var c = cols[int(p["mx"]) % cols.size()]
+		box(Vector3(1.0, 1.9, 0.78), mat(c, 0.5, 0.1), Vector3(0, 0.95, 0), g)
+		box(Vector3(0.62, 1.2, 0.04), unshaded(Color("#cfe9ff")), Vector3(-0.12, 1.15, 0.4), g, false)
+		for row in 4:
+			for col in 3:
+				box(Vector3(0.14, 0.16, 0.05), mat(["#e74c3c", "#f1c40f", "#3498db", "#2ecc71"][(row + col) % 4], 0.6), Vector3(-0.32 + col * 0.2, 0.72 + row * 0.27, 0.43), g, false)
+		box(Vector3(0.22, 0.5, 0.05), mat("#1a1c20", 0.4, 0.5), Vector3(0.36, 1.2, 0.41), g, false)
+		box(Vector3(0.55, 0.16, 0.06), mat("#111214"), Vector3(-0.12, 0.32, 0.41), g, false)
+		p["node"] = g
+	else:
+		box(Vector3(0.9, 2.3, 0.35), mat("#3a3f46", 0.6, 0.3), Vector3(0, 1.15, -0.05), g)
+		box(Vector3(0.78, 1.45, 0.5), mat("#c9ccd2", 0.35, 0.6), Vector3(0, 0.95, 0.1), g)
+		box(Vector3(0.44, 0.3, 0.04), unshaded(Color("#4fa3ff")), Vector3(0, 1.38, 0.36), g, false)
+		box(Vector3(0.5, 0.08, 0.2), mat("#2a2d32", 0.5, 0.4), Vector3(0, 1.08, 0.4), g, false)
+		box(Vector3(0.3, 0.03, 0.06), mat("#0c0d0f"), Vector3(0, 0.84, 0.37), g, false)
+		box(Vector3(0.9, 0.22, 0.05), unshaded(Color("#2b6fd6")), Vector3(0, 2.05, 0.15), g, false)
+		p["node"] = g
 
 
 func make_ring(pos: Vector3, r_in: float, r_out: float, col: Color) -> MeshInstance3D:
@@ -2994,6 +3122,62 @@ func outdoor_action(p: Dictionary) -> Dictionary:
 	return {}
 
 
+func street_action(p: Dictionary) -> Dictionary:
+	var sd = D.STREET[p["kind"]]
+	var left = float(S["cds"].get(p["id"], 0)) - now_ms()
+	if left > 0:
+		return {"l": "VAZIA\n" + mmss(left), "off": true}
+	if not has_tool(sd["tool"]):
+		return {"l": "PRECISAS\n" + ("PÉ-DE-CABRA" if sd["tool"] == "pe_cabra" else "BERBEQUIM"), "off": true}
+	var lbl = "ARROMBAR" if p["kind"] == "venda" else "PERFURAR"
+	return {"l": lbl, "f": func(): start_street(p)}
+
+
+func start_street(p: Dictionary) -> void:
+	var sd = D.STREET[p["kind"]]
+	search = {"kind": "street", "p": p, "t": 0.0, "need": float(sd["need"]), "label": ("A ARROMBAR: " if p["kind"] == "venda" else "A PERFURAR: ") + str(sd["n"]).to_upper()}
+	if p["kind"] == "mb":
+		# o multibanco tem alarme ligado à central e chama a atenção de outros grupos
+		wanted = maxi(wanted, 1)
+		lost_t = 0.0
+		feed_add("Alarme do multibanco!", RED)
+		if randf() < 0.5:
+			spawn_rivals(p, randi_range(2, 3))
+	elif randf() < 0.2:
+		feed_add("Alguém viu-te a arrombar a máquina", RED)
+		wanted = maxi(wanted, 1)
+		lost_t = 0.0
+
+
+func spawn_rivals(p: Dictionary, n: int) -> void:
+	toast("Rivais querem o mesmo multibanco!", RED)
+	feed_add("Disputa: rivais a caminho", PURPLE)
+	for k in n:
+		var rp = road_point_near(24.0, 40.0, randf() < 0.5)
+		if rp.x < 0:
+			continue
+		var gm = make_char("Rogue_Hooded", true, "#8a3a3a")
+		add_child(gm)
+		gang.append({"x": rp.x, "y": rp.y, "hp": 40.0, "cd": randf_range(0.8, 1.6), "ang": 0.0, "mesh": gm, "phase": 0.0, "terr": ""})
+
+
+func finish_street(p: Dictionary) -> void:
+	var sd = D.STREET[p["kind"]]
+	S["cds"][p["id"]] = now_ms() + float(sd["cd"]) * 60000.0
+	var c = {"n": sd["n"], "items": [], "dims": sd["dims"]}
+	for st in roll_loot(sd["loot"]):
+		grid_add(c["items"], int(sd["dims"][0]), int(sd["dims"][1]), st)
+	for it in c["items"]:
+		it["hid"] = true
+		it["rev"] = 0.0
+	if p.has("node") and is_instance_valid(p["node"]):
+		p["node"].rotation.z = 0.05
+	last_act = "?"
+	open_loot(c)
+	if p["kind"] == "mb":
+		toast("Notas marcadas: lava-as na Lavandaria Bolha", GOLD)
+
+
 func finish_rear(ref: String) -> void:
 	Z["rear_open"][ref] = true
 	if D.HEISTS[ref].get("alarm", false) and not alarm_off(ref):
@@ -3588,6 +3772,8 @@ func roll_loot(table: Array) -> Array:
 	for L in table:
 		if L.has("cash"):
 			out.append({"id": "cash", "v": int(round(randi_range(L["cash"][0], L["cash"][1]) / 100.0)) * 100})
+		elif L.has("sujo"):
+			out.append({"id": "sujo", "v": int(round(randi_range(L["sujo"][0], L["sujo"][1]) / 100.0)) * 100})
 		elif L.has("story_item"):
 			if int(S["story"]) == int(L["chapter"]) and count_item(L["story_item"]) == 0:
 				out.append({"id": L["story_item"], "q": 1})
@@ -3861,7 +4047,7 @@ func near_van() -> Dictionary:
 
 func van_price(st: Dictionary, v: Dictionary) -> int:
 	var it = item_def(st["id"])
-	if st["id"] == "cash" or it["cat"] == "historia":
+	if is_money(st["id"]) or it["cat"] == "historia":
 		return 0
 	var mult = 1.3 if it["cat"] == v["type"]["cat"] else 0.9
 	return int(round(float(it["v"]) * int(st.get("q", 1)) * mult * terr_bonus() / 10.0)) * 10
@@ -4101,6 +4287,8 @@ func ctx_action() -> Dictionary:
 		if not p.is_empty():
 			if p["kind"] in ["rear", "alarm"]:
 				return outdoor_action(p)
+			if p["kind"] in ["venda", "mb"]:
+				return street_action(p)
 			if p["kind"] == "heist":
 				var lock = heist_locked(p["id"])
 				if lock != "":
@@ -4365,6 +4553,15 @@ func update_game(dt: float) -> void:
 				var rref = search["ref"]
 				search = {}
 				finish_rear(rref)
+		else:
+			search = {}
+	if not search.is_empty() and search["kind"] == "street":
+		var sp = search["p"]
+		if not P["in_car"] and dist(P, sp) < 2.4:
+			search["t"] = search["t"] + dt
+			if search["t"] >= search["need"]:
+				search = {}
+				finish_street(sp)
 		else:
 			search = {}
 	if not search.is_empty() and search["kind"] == "table":
@@ -5498,7 +5695,7 @@ func _draw_minimap() -> void:
 				continue
 			var sp = to_scr.call(Vector2(p["x"], p["y"]))
 			if Rect2(Vector2(-10, -10), sz + Vector2(20, 20)).has_point(sp):
-				_draw_icon(minimap, sp, p["id"], 8.0)
+				_draw_icon(minimap, sp, p["kind"] if p["kind"] in ["venda", "mb"] else p["id"], 6.0 if p["kind"] in ["venda", "mb"] else 8.0)
 		for p in police:
 			minimap.draw_circle(to_scr.call(Vector2(p["x"], p["y"])), 4.5, RED if int(t * 6) % 2 == 0 else Color("#3a6aff"))
 		for g in gang:
@@ -5575,6 +5772,9 @@ func _draw_fullmap() -> void:
 		if p["kind"] in ["rear", "alarm"]:
 			continue
 		var sp = to_scr.call(Vector2(p["x"], p["y"]))
+		if p["kind"] in ["venda", "mb"]:
+			_draw_icon(fullmap_area, sp, p["kind"], 8.0)
+			continue
 		_draw_icon(fullmap_area, sp, p["id"], 13.0)
 		var sub = p["name"]
 		if D.HEISTS.has(p["id"]):
@@ -5691,8 +5891,12 @@ func item_max(id: String) -> int:
 	return int(item_def(id).get("max", 1))
 
 
+func is_money(id: String) -> bool:
+	return id == "cash" or id == "sujo"
+
+
 func stack_value(st: Dictionary) -> int:
-	if st["id"] == "cash":
+	if is_money(st["id"]):
 		return int(st["v"])
 	return int(item_def(st["id"])["v"]) * int(st.get("q", 1))
 
@@ -5700,7 +5904,7 @@ func stack_value(st: Dictionary) -> int:
 func item_tier(st: Dictionary) -> int:
 	if item_def(st["id"])["cat"] == "historia":
 		return 4
-	var v = stack_value(st) if st["id"] == "cash" else int(item_def(st["id"])["v"])
+	var v = stack_value(st) if is_money(st["id"]) else int(item_def(st["id"])["v"])
 	if v < 1000:
 		return 0
 	if v < 3000:
@@ -5747,7 +5951,7 @@ func grid_spot(items: Array, cols: int, rows: int, sz: Vector2i) -> Vector2i:
 
 func grid_add(items: Array, cols: int, rows: int, st: Dictionary) -> int:
 	## mete um item (ou dinheiro) numa grelha; junta a pilhas existentes; devolve quanto entrou
-	var is_cash = st["id"] == "cash"
+	var is_cash = is_money(st["id"])
 	var left = int(st["v"]) if is_cash else int(st.get("q", 1))
 	var mx = CASH_MAX if is_cash else item_max(st["id"])
 	var key = "v" if is_cash else "q"
@@ -5828,7 +6032,7 @@ func total_money() -> int:
 func count_item(id: String) -> int:
 	var n = 0
 	for st in S["inv"]:
-		if st["id"] == id and st["id"] != "cash":
+		if st["id"] == id and not is_money(st["id"]):
 			n += int(st.get("q", 1))
 	return n
 
@@ -5837,7 +6041,7 @@ func remove_item(id: String, q: int) -> void:
 	var keep = []
 	var left = q
 	for st in S["inv"]:
-		if st["id"] == id and st["id"] != "cash" and left > 0:
+		if st["id"] == id and not is_money(st["id"]) and left > 0:
 			var take = mini(left, int(st.get("q", 1)))
 			st["q"] = int(st.get("q", 1)) - take
 			left -= take
@@ -6078,7 +6282,7 @@ func quick_move(src, dst, it: Dictionary) -> void:
 	st.erase("x")
 	st.erase("y")
 	var n = grid_add(dst.items, dst.cols, dst.rows, st)
-	var key = "v" if it["id"] == "cash" else "q"
+	var key = "v" if is_money(it["id"]) else "q"
 	var total = int(it.get(key, 1))
 	if n <= 0:
 		toast("Não há espaço", RED)
@@ -6101,8 +6305,8 @@ func _grid_dropped(src, dst, it: Dictionary, cell: Vector2i) -> void:
 		if o != it and o["id"] == it["id"] and not o.get("hid", false):
 			var s2 = item_size(o["id"])
 			if cell.x >= int(o["x"]) - sz.x + 1 and cell.x <= int(o["x"]) + s2.x - 1 and cell.y >= int(o["y"]) - sz.y + 1 and cell.y <= int(o["y"]) + s2.y - 1:
-				var key = "v" if it["id"] == "cash" else "q"
-				var mx = CASH_MAX if it["id"] == "cash" else item_max(it["id"])
+				var key = "v" if is_money(it["id"]) else "q"
+				var mx = CASH_MAX if is_money(it["id"]) else item_max(it["id"])
 				var add = mini(int(it.get(key, 1)), mx - int(o.get(key, 1)))
 				if add > 0:
 					o[key] = int(o.get(key, 1)) + add
@@ -6183,7 +6387,7 @@ func _loot_take_all() -> void:
 			continue
 		var st = it.duplicate()
 		var n = grid_add(S["inv"], d.x, d.y, st)
-		var key = "v" if it["id"] == "cash" else "q"
+		var key = "v" if is_money(it["id"]) else "q"
 		if n >= int(it.get(key, 1)):
 			loot_c["items"].erase(it)
 		else:
@@ -6322,6 +6526,65 @@ func open_shop(id: String) -> void:
 		open_menu("Imobiliária Chave d'Ouro", menu_imob)
 	elif id == "home":
 		open_menu("Esconderijo", menu_home)
+	elif id == "lavandaria":
+		open_menu("Lavandaria Bolha", menu_wash)
+
+
+func dirty_cash() -> int:
+	var n = 0
+	for st in S["inv"]:
+		if st["id"] == "sujo":
+			n += int(st["v"])
+	return n
+
+
+func take_dirty(amount: int) -> void:
+	var left = amount
+	var keep = []
+	for st in S["inv"]:
+		if st["id"] == "sujo" and left > 0:
+			var tk = mini(left, int(st["v"]))
+			st["v"] = int(st["v"]) - tk
+			left -= tk
+			if int(st["v"]) <= 0:
+				continue
+		keep.append(st)
+	S["inv"] = keep
+
+
+func menu_wash(box: VBoxContainer) -> void:
+	if not S.has("wash"):
+		S["wash"] = []
+	note(box, "Notas marcadas não se gastam nem se vendem. Aqui ficam limpas — com comissão de %d%% e algum tempo de espera." % int(D.WASH_FEE * 100), true)
+	var dirty = dirty_cash()
+	var busy = 0
+	for w in S["wash"]:
+		busy += int(w["amt"])
+	var room = maxi(0, D.WASH_MAX - busy)
+	var amt = mini(dirty, room)
+	var net = int(round(amt * (1.0 - D.WASH_FEE) / 100.0)) * 100
+	var mins = maxf(1.0, amt / 10000.0 * D.WASH_MIN_PER_10K)
+	h3(box, "Lavar")
+	row(box, "Na mochila: " + fmt(dirty), "Recebes %s em %d min" % [fmt(net), int(ceil(mins))] if amt > 0 else ("Máquinas cheias" if dirty > 0 else "Sem notas marcadas"), "Lavar " + fmt(amt), func():
+		var a2 = mini(dirty_cash(), maxi(0, D.WASH_MAX - busy))
+		if a2 <= 0:
+			return
+		take_dirty(a2)
+		var n2 = int(round(a2 * (1.0 - D.WASH_FEE) / 100.0)) * 100
+		S["wash"].append({"amt": a2, "net": n2, "ready": now_ms() + maxf(1.0, a2 / 10000.0 * D.WASH_MIN_PER_10K) * 60000.0})
+		toast("A lavar " + fmt(a2), OK_C), "g", amt <= 0, "sujo")
+	if not S["wash"].is_empty():
+		h3(box, "Em lavagem")
+		var i = 0
+		for w in S["wash"]:
+			var left = float(w["ready"]) - now_ms()
+			var idx = i
+			row(box, fmt(w["net"]) + " limpos", "Pronto" if left <= 0 else "Falta " + mmss(left), "Recolher", func():
+				var ww = S["wash"][idx]
+				S["wash"].remove_at(idx)
+				add_money(int(ww["net"]))
+				toast("+" + fmt(ww["net"]) + " no cofre", GOLD), "o", left > 0, "cash")
+			i += 1
 
 
 func story_advance() -> void:

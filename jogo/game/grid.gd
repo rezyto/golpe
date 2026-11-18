@@ -93,7 +93,7 @@ func _draw() -> void:
 		var szi = game.item_size(it["id"])
 		if szi.x >= 2 and cell >= 60.0:
 			draw_string(font, r.position + Vector2(6, 20), game.item_def(it["id"])["n"], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 10, 15, Color(1, 1, 1, 0.75))
-		if it["id"] != "cash" and int(it.get("q", 1)) > 1:
+		if not it.has("v") and int(it.get("q", 1)) > 1:
 			draw_string(font, Vector2(r.position.x, r.position.y + 20), "×%d " % it["q"], HORIZONTAL_ALIGNMENT_RIGHT, r.size.x, 18, Color.WHITE)
 		var val = game.stack_value(it)
 		var txt = ""
