@@ -899,7 +899,13 @@ func setup_3d() -> void:
 	sun.light_color = Color("#ffd9a6")
 	sun.light_energy = 1.2
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 55.0
+	# 2 divisões chegam para câmara de terceira pessoa e custam metade no telemóvel
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_split_1 = 0.3
+	sun.directional_shadow_max_distance = 42.0
+	sun.directional_shadow_fade_start = 0.85
+	sun.shadow_bias = 0.06
+	sun.shadow_normal_bias = 1.2
 	sun.rotation_degrees = Vector3(-36, -38, 0)
 	add_child(sun)
 	cam = Camera3D.new()
@@ -2048,9 +2054,36 @@ func finish_zone(z: Dictionary, r: RandomNumberGenerator, n_parked: int) -> void
 		z["blocks"].append(blk)
 
 
+# grelha espacial: cada consulta só vê os blocos da célula onde está (em vez de todos)
+const BG_CELL = 12.0
+const BG_MARGIN = 3.0
+var bgrid = {}
+var bgrid_src: Variant = null
+var bgrid_n = -1
+
+
+func blocks_near(x: float, y: float) -> Array:
+	if bgrid_src == null or not is_same(bgrid_src, blocks_now) or bgrid_n != blocks_now.size():
+		bgrid = {}
+		bgrid_src = blocks_now
+		bgrid_n = blocks_now.size()
+		for b in blocks_now:
+			var x0 = int(floor((float(b["x"]) - BG_MARGIN) / BG_CELL))
+			var x1 = int(floor((float(b["x"]) + float(b["w"]) + BG_MARGIN) / BG_CELL))
+			var y0 = int(floor((float(b["y"]) - BG_MARGIN) / BG_CELL))
+			var y1 = int(floor((float(b["y"]) + float(b["h"]) + BG_MARGIN) / BG_CELL))
+			for cx in range(x0, x1 + 1):
+				for cy in range(y0, y1 + 1):
+					var k = Vector2i(cx, cy)
+					if not bgrid.has(k):
+						bgrid[k] = []
+					bgrid[k].append(b)
+	return bgrid.get(Vector2i(int(floor(x / BG_CELL)), int(floor(y / BG_CELL))), [])
+
+
 func push_out(o: Dictionary, rad: float) -> bool:
 	var hit = false
-	for b in blocks_now:
+	for b in blocks_near(o["x"], o["y"]):
 		var bx: float = b["x"]
 		var by: float = b["y"]
 		var bw: float = b["w"]
@@ -2086,7 +2119,7 @@ func push_out(o: Dictionary, rad: float) -> bool:
 
 
 func in_block(x: float, y: float) -> bool:
-	for b in blocks_now:
+	for b in blocks_near(x, y):
 		if b.get("water", false):
 			continue
 		if x > b["x"] and x < b["x"] + b["w"] and y > b["y"] and y < b["y"] + b["h"]:
@@ -2095,7 +2128,7 @@ func in_block(x: float, y: float) -> bool:
 
 
 func solid_at(x: float, y: float, h: float) -> bool:
-	for b in blocks_now:
+	for b in blocks_near(x, y):
 		var hg = float(b.get("hgt", 10.0))
 		if hg <= 0:
 			continue
