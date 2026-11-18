@@ -1,0 +1,45 @@
+name: GOLPE — personagens realistas (MPFB2, CC0)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/mpfb_*.py
+      - .github/workflows/chars.yml
+
+permissions:
+  contents: write
+
+jobs:
+  chars:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Blender 4.2 LTS
+        run: |
+          wget -q https://download.blender.org/release/Blender4.2/blender-4.2.3-linux-x64.tar.xz
+          tar -xf blender-4.2.3-linux-x64.tar.xz
+          echo "$PWD/blender-4.2.3-linux-x64" >> $GITHUB_PATH
+          sudo apt-get install -y -qq libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libxkbcommon0 libsm6 > /dev/null
+      - name: MPFB2 + pacotes de recursos CC0
+        run: |
+          python3 - <<'PY'
+          import re, urllib.request
+          UA={"User-Agent":"GOLPE/1.0"}
+          def get(u): return urllib.request.urlopen(urllib.request.Request(u,headers=UA),timeout=120).read()
+          # extensão MPFB do repositório oficial de extensões do Blender
+          page=get("https://extensions.blender.org/add-ons/mpfb/").decode()
+          links=sorted(set(re.findall(r'href="([^"]+\.zip[^"]*)"',page)))
+          print("links mpfb:",links[:10])
+          url=[l for l in links if "download" in l or l.endswith(".zip")][0]
+          if url.startswith("/"): url="https://extensions.blender.org"+url
+          open("mpfb.zip","wb").write(get(url))
+          ap=get("https://static.makehumancommunity.org/assets/assetpacks/index.html").decode()
+          packs=sorted(set(re.findall(r'href="([^"]+\.zip)"',ap)))
+          print("pacotes:",len(packs)); [print("  ",p) for p in packs[:80]]
+          open("packs.txt","w").write("\n".join(packs))
+          PY
+          blender -b --command extension install-file -r user_default -e mpfb.zip || true
+          ls ~/.config/blender/4.2/extensions/user_default/ || true
+      - name: Explorar API
+        run: blender -b --python tools/mpfb_probe.py 2>&1 | grep -E "ADDON|MODS|HS |LOC |AS |Error|error" | head -150
