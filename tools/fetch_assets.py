@@ -146,10 +146,13 @@ def fetch_models(limit=24):
 # ---------------------------------------------------------------- Sons (OpenGameArt, CC0)
 OGA_PAGES = {
     "armas": "https://opengameart.org/content/the-free-firearm-sound-library",
-    "impactos": "https://kenney.nl/assets/impact-sounds",
-    "interface": "https://kenney.nl/assets/interface-sounds",
-    "rpg": "https://kenney.nl/assets/rpg-audio",
-    "ui": "https://kenney.nl/assets/ui-audio",
+    "passos": "https://opengameart.org/content/fantozzis-footsteps-grasssand-stone",
+    "geral": "https://opengameart.org/node/86682",
+    "portas": "https://opengameart.org/content/door-open-door-close-set",
+    "interface": "https://opengameart.org/content/51-ui-sound-effects-buttons-switches-and-clicks",
+    "armas_manuseio": "https://opengameart.org/content/handling-guns",
+    "socos": "https://opengameart.org/content/37-hitspunches",
+    "choque": "https://opengameart.org/content/crash-collision",
 }
 
 
@@ -168,22 +171,28 @@ def fetch_sounds():
         if not links:
             print("sem ficheiros em", page)
             continue
-        url = links[0]
-        try:
-            data = get(url.replace(" ", "%20"))
-        except Exception as e:
-            print("falhou ficheiro", url, e)
+        # só páginas com licença CC0
+        lic = re.search(r'License\(s\):(.{0,600})', html, re.S)
+        if not lic or "CC0" not in lic.group(1):
+            print("  não é CC0, ignorado:", page)
             continue
         dest = f"{OUT}/raw_snd/{role}"
         os.makedirs(dest, exist_ok=True)
-        fn = os.path.join(dest, os.path.basename(url).replace("%20", "_"))
-        save(fn, data)
-        if fn.endswith(".zip"):
-            zipfile.ZipFile(io.BytesIO(data)).extractall(dest)
-        elif fn.endswith(".7z"):
-            subprocess.run(["7z", "x", "-y", "-o" + dest, fn], check=False, stdout=subprocess.DEVNULL)
-        credit("sons " + role, os.path.basename(url), page)
-        print("sons", role, "<-", url)
+        url = ""
+        for url in links[:12]:
+            try:
+                data = get(url.replace(" ", "%20"))
+            except Exception as e:
+                print("falhou ficheiro", url, e)
+                continue
+            fn = os.path.join(dest, os.path.basename(url).replace("%20", "_"))
+            save(fn, data)
+            if fn.endswith(".zip"):
+                zipfile.ZipFile(io.BytesIO(data)).extractall(dest)
+            elif fn.endswith(".7z"):
+                subprocess.run(["7z", "x", "-y", "-o" + dest, fn], check=False, stdout=subprocess.DEVNULL)
+        credit("sons " + role, ", ".join(os.path.basename(u).replace("%20", " ") for u in links[:12]), page)
+        print("sons", role, "<-", len(links[:12]), "ficheiros")
 
 
 SND_ROLES = {
@@ -191,19 +200,20 @@ SND_ROLES = {
     "tiro_smg": ["/ppsh/", "/carl gustav m45/"],
     "tiro_espingarda": ["/ak-47/", "/ar-15/", "/sks/"],
     "tiro_caçadeira": ["/mossberg/", "/nova/", "/model 12/"],
-    "recarregar": ["reload", "magazine", "mag_in", "clip"],
+    "recarregar": ["/armas_manuseio/"],
     "seco": ["dry", "empty", "click"],
-    "passo": ["footstep", "step"],
-    "porta": ["door"],
+    "passo": ["/passos/", "footstep"],
+    "porta": ["/portas/"],
     "vidro": ["glass", "shatter"],
-    "impacto": ["impact", "hit", "punch"],
+    "impacto": ["/socos/", "impact"],
+    "choque": ["/choque/", "crash"],
     "metal": ["metal"],
     "ui": ["click", "select", "switch", "confirm", "tick"],
     "moeda": ["coin", "cash", "money"],
 }
 
 
-def curate_sounds(per_role=4):
+def curate_sounds(per_role=6):
     import shutil
     raw = f"{OUT}/raw_snd"
     if not os.path.isdir(raw):
@@ -223,6 +233,8 @@ def curate_sounds(per_role=4):
         for fp in files:
             name = fp.lower().replace("\\", "/")
             if role == "ui" and "/interface/" not in name:
+                continue
+            if role in ("seco", "metal") and "/geral/" not in name:
                 continue
             if not any(w in name[len(raw):] for w in words):
                 continue
