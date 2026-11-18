@@ -21,6 +21,9 @@ var world: Node3D
 var world_int: Node3D
 var cam: Camera3D
 var sun: DirectionalLight3D
+var env_main: Environment
+var sky_main: ProceduralSkyMaterial
+const HOUR_SECS = 40.0   # segundos reais por hora de jogo (um dia = 16 min)
 var siren: OmniLight3D
 var rings = []
 var flags = {}
@@ -412,6 +415,43 @@ func shots() -> void:
 	wanted = 3
 	await tr.create_timer(5.0).timeout
 	await shot("26_policia")
+	wanted = 0
+	await tr.create_timer(0.5).timeout
+	# turno de polícia e encomenda
+	S["cds"].erase("duty")
+	start_duty()
+	spawn_suspect()
+	if suspects.size() > 0:
+		var sq = suspects[0]
+		sq["state"] = "run"
+		P["x"] = sq["x"] - 6.0
+		P["y"] = sq["y"] + 2.0
+		cam_yaw = 0.0
+		snap_cam = true
+		await tr.create_timer(1.2).timeout
+		await shot("27_turno_policia")
+	end_duty(false)
+	await tr.create_timer(0.3).timeout
+	spawn_drop()
+	if drops.size() > 0:
+		var dr = drops[drops.size() - 1]
+		P["x"] = dr["x"] - 3.0
+		P["y"] = dr["y"] + 1.0
+		cam_yaw = 0.0
+		snap_cam = true
+		await tr.create_timer(1.0).timeout
+		await shot("28_encomenda")
+	# noite
+	S["clock"] = 22.5
+	update_daynight(0.0)
+	P["x"] = 120.0
+	P["y"] = 97.0
+	await tr.create_timer(1.0).timeout
+	await shot("29_noite")
+	S["clock"] = 19.0
+	update_daynight(0.0)
+	await tr.create_timer(0.6).timeout
+	await shot("30_entardecer")
 	print("SHOTS OK")
 	tr.quit()
 
@@ -706,7 +746,7 @@ func now_ms() -> float:
 func default_save() -> Dictionary:
 	return {"ver": 4, "trunks": {}, "story": 0, "paid": 0, "tools": [], "ties": 0, "nick": "", "money": 5000, "xp": 0, "lvl": 1, "hp": 100.0, "weapon": "p22", "weapons": ["p22"],
 		"car": "pardal", "cars": ["pardal"], "car_hp": 100.0, "bag": "b10", "bags": ["b10"], "props": {}, "terr": {},
-		"inv": [], "wash": [], "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
+		"inv": [], "wash": [], "clock": 10.0, "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
 		"stats": {"heists": 0, "busted": 0, "earned": 0, "hospital": 0}}
 
 
@@ -931,6 +971,8 @@ func setup_3d() -> void:
 	sm.ground_horizon_color = Color("#e3cfae")
 	sm.ground_bottom_color = Color("#3a3a33")
 	sky.sky_material = sm
+	sky_main = sm
+	env_main = env
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -3469,7 +3511,7 @@ func start_street(p: Dictionary) -> void:
 		feed_add("Alarme do multibanco!", RED)
 		if randf() < 0.5:
 			spawn_rivals(p, randi_range(2, 3))
-	elif randf() < 0.2:
+	elif randf() < (0.08 if is_night() else 0.2):
 		feed_add("Alguém viu-te a arrombar a máquina", RED)
 		wanted = maxi(wanted, 1)
 		lost_t = 0.0
@@ -4839,6 +4881,8 @@ func _process(delta: float) -> void:
 		firing = was_firing
 		sim_lock = false
 	if mode != "login" and not Z.is_empty():
+		if not inside:
+			update_daynight(dt)
 		render(dt)
 		update_hud()
 	overlay.queue_redraw()
@@ -4848,6 +4892,49 @@ func _process(delta: float) -> void:
 	if save_t > 5.0 and mode != "login":
 		save_t = 0.0
 		save_game()
+
+
+func game_hour() -> float:
+	return fmod(float(S.get("clock", 10.0)), 24.0)
+
+
+func is_night() -> bool:
+	var h = game_hour()
+	return h < 6.5 or h > 20.5
+
+
+func clock_txt() -> String:
+	var h = game_hour()
+	return "%02d:%02d" % [int(h), int(fmod(h, 1.0) * 60.0)]
+
+
+func update_daynight(dt: float) -> void:
+	if S.is_empty() or sun == null or env_main == null:
+		return
+	var was_night = is_night()
+	S["clock"] = fmod(float(S.get("clock", 10.0)) + dt / HOUR_SECS, 24.0)
+	if is_night() != was_night:
+		if is_night():
+			feed_add("Anoitece — menos testemunhas na rua", Color("#9cb4ff"))
+		else:
+			feed_add("Amanhece", GOLD)
+	var h = game_hour()
+	var e = sin((h - 6.0) / 12.0 * PI)   # >0 de dia
+	var day = clampf(e * 2.5, 0.0, 1.0)  # transição suave ao nascer/pôr do sol
+	if e > 0.0:
+		sun.rotation_degrees = Vector3(-(8.0 + 64.0 * e), -38.0 + (h - 12.0) * 9.0, 0)
+	else:
+		sun.rotation_degrees = Vector3(-35.0, -38.0 + (h - 0.0) * 6.0, 0)  # lua
+	var warm = clampf(1.0 - e * 2.2, 0.0, 1.0)
+	var day_col = Color("#fff0d8").lerp(Color("#ffb070"), warm)
+	sun.light_color = Color("#9fb4e0").lerp(day_col, day)
+	sun.light_energy = lerpf(0.22, 1.25, day)
+	env_main.ambient_light_energy = lerpf(0.22, 0.45, day)
+	sky_main.sky_top_color = Color("#0b1222").lerp(Color("#4f7fbf"), day)
+	sky_main.sky_horizon_color = Color("#22304a").lerp(Color("#d9c7a8").lerp(Color("#f0a070"), warm * 0.7), day)
+	sky_main.ground_horizon_color = Color("#1c2333").lerp(Color("#e3cfae"), day)
+	env_main.fog_light_color = Color("#20283a").lerp(Color("#c9cdd2"), day)
+	env_main.tonemap_exposure = lerpf(1.1, 0.92, day)
 
 
 func update_game(dt: float) -> void:
@@ -5814,8 +5901,7 @@ func toast(text: String, col = LINE) -> void:
 func feed_add(text: String, col = Color("#e8c46a")) -> void:
 	if feed_box == null:
 		return
-	var tm = Time.get_time_dict_from_system()
-	var l = lbl("%02d:%02d  %s" % [tm["hour"], tm["minute"], text], 15, col)
+	var l = lbl("%s  %s" % [clock_txt() if not S.is_empty() else "--:--", text], 15, col)
 	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	l.add_theme_constant_override("shadow_offset_x", 1)
 	l.add_theme_constant_override("shadow_offset_y", 1)
@@ -5859,7 +5945,7 @@ func refresh_hotbar() -> void:
 
 func update_hud() -> void:
 	lbl_money.text = fmt(bag_cash())
-	lbl_lvl.text = "Nível %d · %d/%d" % [S["lvl"], int(S["xp"]), xp_need(int(S["lvl"]))]
+	lbl_lvl.text = "Nível %d · %d/%d   %s" % [S["lvl"], int(S["xp"]), xp_need(int(S["lvl"])), clock_txt()]
 	bar_xp.value = 100.0 * float(S["xp"]) / xp_need(int(S["lvl"]))
 	bar_hp.value = float(S["hp"])
 	bar_car.value = 100.0 * float(S["car_hp"]) / float(car_def()["hp"])
