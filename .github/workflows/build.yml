@@ -83,7 +83,8 @@ jobs:
           godot --headless --export-pack "Patch" ../out/game.pck 2>&1 | tee -a export.log
           ls -la ../out
           test -s ../out/golpe.apk && test -s ../out/game.pck
-          echo "{\"content\":\"${{ steps.v.outputs.cv }}\",\"app\":\"${{ steps.v.outputs.av }}\",\"date\":\"$(date -u +%F)\",\"commit\":\"${GITHUB_SHA::7}\"}" > ../out/version.json
+          SZ=$(stat -c %s ../out/game.pck); SHA=$(sha256sum ../out/game.pck | cut -d' ' -f1); MIN=$(cat boot/min_app.txt 2>/dev/null || echo 0.0.0)
+          echo "{\"content\":\"${{ steps.v.outputs.cv }}\",\"app\":\"${{ steps.v.outputs.av }}\",\"min_app\":\"$MIN\",\"size\":$SZ,\"sha256\":\"$SHA\",\"date\":\"$(date -u +%F)\",\"commit\":\"${GITHUB_SHA::7}\"}" > ../out/version.json
           cat ../out/version.json
       - name: Publicar em Releases (latest)
         uses: softprops/action-gh-release@v2

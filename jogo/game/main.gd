@@ -2346,6 +2346,8 @@ func enter_place(id: String) -> void:
 	clear_skids()
 	refresh_hotbar()
 	feed_add("Chegaste a " + Z["name"])
+	if FileAccess.file_exists("user://boot_pending.txt"):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://boot_pending.txt"))
 	save_game()
 
 
