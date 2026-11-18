@@ -23,6 +23,8 @@ var cam: Camera3D
 var sun: DirectionalLight3D
 var env_main: Environment
 var sky_main: ProceduralSkyMaterial
+var sky_pano: PanoramaSkyMaterial
+var sky_cur = "dia"
 const HOUR_SECS = 40.0   # segundos reais por hora de jogo (um dia = 16 min)
 var siren: OmniLight3D
 var rings = []
@@ -980,6 +982,11 @@ func setup_3d() -> void:
 	sky.sky_material = sm
 	sky_main = sm
 	env_main = env
+	if ResourceLoader.exists("res://assets/ext/hdri/dia.hdr"):
+		sky_pano = PanoramaSkyMaterial.new()
+		sky_pano.panorama = load("res://assets/ext/hdri/dia.hdr")
+		sky.sky_material = sky_pano
+		sky_main = null
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -1703,9 +1710,46 @@ func tex_shop(col: String) -> StandardMaterial3D:
 	return m
 
 
+const PBR_MAP = {"asfalto": ["asfalto", 0.33], "calcada": ["calcada", 0.45], "relva": ["relva", 0.2], "praca": ["passeio", 0.3]}
+
+
+func pbr_tex(role: String, map: String) -> Texture2D:
+	var path = "res://assets/ext/tex/%s_%s.jpg" % [role, map]
+	return load(path) if ResourceLoader.exists(path) else null
+
+
+func pbr_mat(role: String, scale: float, tint = Color.WHITE) -> StandardMaterial3D:
+	## material fotográfico (Poly Haven, CC0) com mapa normal e rugosidade, projetado no mundo
+	var alb = pbr_tex(role, "albedo")
+	if alb == null:
+		return null
+	var m = StandardMaterial3D.new()
+	m.albedo_texture = alb
+	m.albedo_color = tint
+	var nm = pbr_tex(role, "normal")
+	if nm:
+		m.normal_enabled = true
+		m.normal_texture = nm
+		m.normal_scale = 1.0
+	var rg = pbr_tex(role, "rough")
+	if rg:
+		m.roughness_texture = rg
+		m.roughness = 1.0
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE * scale
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return m
+
+
 func tex_ground(kind: String) -> StandardMaterial3D:
 	if tex_cache.has(kind):
 		return tex_cache[kind]
+	if PBR_MAP.has(kind):
+		var pm = pbr_mat(PBR_MAP[kind][0], PBR_MAP[kind][1])
+		if pm:
+			tex_cache[kind] = pm
+			return pm
 	var rng = RandomNumberGenerator.new()
 	rng.seed = hash(kind)
 	var img = Image.create(256, 256, false, Image.FORMAT_RGBA8)
@@ -5013,9 +5057,16 @@ func update_daynight(dt: float) -> void:
 	sun.light_color = Color("#9fb4e0").lerp(day_col, day)
 	sun.light_energy = lerpf(0.22, 1.25, day)
 	env_main.ambient_light_energy = lerpf(0.22, 0.45, day)
-	sky_main.sky_top_color = Color("#0b1222").lerp(Color("#4f7fbf"), day)
-	sky_main.sky_horizon_color = Color("#22304a").lerp(Color("#d9c7a8").lerp(Color("#f0a070"), warm * 0.7), day)
-	sky_main.ground_horizon_color = Color("#1c2333").lerp(Color("#e3cfae"), day)
+	if sky_main:
+		sky_main.sky_top_color = Color("#0b1222").lerp(Color("#4f7fbf"), day)
+		sky_main.sky_horizon_color = Color("#22304a").lerp(Color("#d9c7a8").lerp(Color("#f0a070"), warm * 0.7), day)
+		sky_main.ground_horizon_color = Color("#1c2333").lerp(Color("#e3cfae"), day)
+	if sky_pano:
+		var want = "dia" if (h >= 8.0 and h < 18.5) else ("tarde" if (h >= 6.0 and h < 8.0) or (h >= 18.5 and h < 21.0) else "noite")
+		if want != sky_cur and ResourceLoader.exists("res://assets/ext/hdri/%s.hdr" % want):
+			sky_cur = want
+			sky_pano.panorama = load("res://assets/ext/hdri/%s.hdr" % want)
+		sky_pano.energy_multiplier = lerpf(0.35, 1.0, day)
 	env_main.fog_light_color = Color("#20283a").lerp(Color("#c9cdd2"), day)
 	env_main.tonemap_exposure = lerpf(1.1, 0.92, day)
 
