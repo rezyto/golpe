@@ -199,7 +199,7 @@ SND_ROLES = {
     "tiro_pistola": ["/1911/", "/walther ppq/", "/bersa/", "/ruger mark iii/"],
     "tiro_smg": ["/ppsh/", "/carl gustav m45/"],
     "tiro_espingarda": ["/ak-47/", "/ar-15/", "/sks/"],
-    "tiro_caçadeira": ["/mossberg/", "/nova/", "/model 12/"],
+    "tiro_cacadeira": ["/mossberg/", "/nova/", "/model 12/"],
     "recarregar": ["/armas_manuseio/"],
     "seco": ["dry", "empty", "click"],
     "passo": ["/passos/", "footstep"],

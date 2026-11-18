@@ -156,6 +156,7 @@ func _ready() -> void:
 	load_game()
 	setup_3d()
 	setup_ui()
+	setup_audio()
 	offline_income()
 	show_login()
 	if OS.get_cmdline_user_args().has("--autotest"):
@@ -3233,6 +3234,7 @@ func drive_player(c: Dictionary, iv: Vector2, dt: float, cd: Dictionary) -> void
 				v -= n * vn * 1.3
 				var impact = -vn
 				if impact > 5.0:
+					sfx("choque", Vector3(c["x"], 0.8, c["y"]), clampf(impact - 14.0, -14.0, 2.0))
 					var dmg = (impact - 5.0) * 2.0
 					cam_shake = maxf(cam_shake, minf(1.0, impact / 18.0))
 					boom(c["x"] - n.x * 1.6, c["y"] - n.y * 1.6, Color("#ffd56a"), int(clampf(impact, 4, 16)))
@@ -3799,6 +3801,7 @@ func cont_height(kind: String) -> float:
 
 
 func enter_interior(poi: Dictionary, rear = false) -> void:
+	sfx("porta", null, -6.0)
 	var id: String = poi["id"]
 	var h = D.HEISTS[id]
 	var lock = heist_locked(id)
@@ -4229,6 +4232,7 @@ func roll_loot(table: Array) -> Array:
 
 
 func exit_interior(rear = false) -> void:
+	sfx("porta", null, -6.0)
 	var h = D.HEISTS[I["id"]]
 	var door = I["door"]
 	var searched = int(I["searched"])
@@ -4858,6 +4862,7 @@ func shoot() -> void:
 		a = atan2(-cos(cam_yaw), -sin(cam_yaw))
 	if not P["in_car"]:
 		P["ang"] = a
+	sfx(gun_role(w["id"]), null, -3.0, 0.06)
 	for i in int(w["pel"]):
 		fire_bullet(P["x"] + cos(a), P["y"] + sin(a), a + randf_range(-w["spr"], w["spr"]), "p", w["dmg"], w["range"] / 52.0)
 	P["fire_cd"] = w["rate"]
@@ -4957,6 +4962,7 @@ func _process(delta: float) -> void:
 			update_game(dt)
 		firing = was_firing
 		sim_lock = false
+	update_audio(dt)
 	if mode != "login" and not Z.is_empty():
 		if not inside:
 			update_daynight(dt)
@@ -5119,6 +5125,7 @@ func update_game(dt: float) -> void:
 			p["cd"] = p["cd"] - dt
 			if p["cd"] <= 0 and d < 19.0:
 				fire_bullet(p["x"], p["y"], atan2(dy, dx) + randf_range(-0.12, 0.12), "e", 5, 0.4)
+				sfx("tiro_pistola", Vector3(p["x"], 1.4, p["y"]), -4.0)
 				p["cd"] = maxf(0.45, 1.2 - wanted * 0.12)
 		p["hit_cd"] = p["hit_cd"] - dt
 		if d < 3.7:
@@ -5201,6 +5208,7 @@ func update_game(dt: float) -> void:
 				g["cd"] = g["cd"] - dt
 				if g["cd"] <= 0:
 					fire_bullet(g["x"], g["y"], g["ang"] + randf_range(-0.15, 0.15), "e", 6, 0.5)
+					sfx("tiro_smg", Vector3(g["x"], 1.4, g["y"]), -4.0)
 					g["cd"] = randf_range(0.9, 1.5)
 			g["moving"] = moving
 			g["shooting"] = d2 < 20.0 and not moving
@@ -5213,6 +5221,7 @@ func update_game(dt: float) -> void:
 			g["cd"] = g["cd"] - dt
 			if g["cd"] <= 0:
 				fire_bullet(g["x"], g["y"], g["ang"] + randf_range(-0.15, 0.15), "e", 6, 0.6)
+				sfx("tiro_pistola", Vector3(g["x"], 1.4, g["y"]), -4.0)
 				g["cd"] = randf_range(0.9, 1.5)
 		push_out(g, 0.45)
 		g["moving"] = moving
@@ -5550,6 +5559,7 @@ func full(c: Control) -> void:
 
 func ui_button(text: String, cb: Callable, kind = "", disabled = false) -> Button:
 	var b = Button.new()
+	b.pressed.connect(func(): sfx("ui", null, -10.0, 0.03))
 	b.text = text.to_upper()
 	b.disabled = disabled
 	b.custom_minimum_size = Vector2(130, 46)
@@ -7251,6 +7261,164 @@ func menu_settings(box: VBoxContainer) -> void:
 	choice_row(box, "Vibração", ["Não", "Sim"], 1 if cfg("vib") else 0, func(i): set_cfg("vib", i == 1))
 	h3(box, "Conta")
 	note(box, "Jogador: %s  ·  versão %s (app %s)" % [str(S.get("nick", "")), str(Engine.get_meta("content_version", "?")), str(Engine.get_meta("app_version", "?"))])
+
+
+# =====================================================================
+#  SOM: amostras CC0 + motor e sirene sintetizados em tempo real
+# =====================================================================
+var snd_cache = {}
+var snd_pool = []
+var snd_pool2d = []
+var snd_i = 0
+var eng_player: AudioStreamPlayer
+var eng_pb: AudioStreamGeneratorPlayback
+var eng_phase = 0.0
+var eng_rpm = 0.0
+var sir_player: AudioStreamPlayer3D
+var sir_pb: AudioStreamGeneratorPlayback
+var sir_phase = 0.0
+var sir_t = 0.0
+var amb_player: AudioStreamPlayer
+var amb_pb: AudioStreamGeneratorPlayback
+var amb_lp = 0.0
+var step_t = 0.0
+const MIX = 22050.0
+
+
+func snd_list(role: String) -> Array:
+	if not snd_cache.has(role):
+		var arr = []
+		for i in 8:
+			var path = "res://assets/ext/snd/%s_%d.ogg" % [role, i]
+			if ResourceLoader.exists(path):
+				arr.append(load(path))
+		snd_cache[role] = arr
+	return snd_cache[role]
+
+
+func setup_audio() -> void:
+	for i in 14:
+		var a = AudioStreamPlayer3D.new()
+		a.unit_size = 6.0
+		a.max_distance = 90.0
+		a.attenuation_filter_cutoff_hz = 6000.0
+		add_child(a)
+		snd_pool.append(a)
+	for i in 4:
+		var b = AudioStreamPlayer.new()
+		add_child(b)
+		snd_pool2d.append(b)
+	eng_player = AudioStreamPlayer.new()
+	var g = AudioStreamGenerator.new()
+	g.mix_rate = MIX
+	g.buffer_length = 0.12
+	eng_player.stream = g
+	eng_player.volume_db = -14.0
+	add_child(eng_player)
+	eng_player.play()
+	eng_pb = eng_player.get_stream_playback()
+	sir_player = AudioStreamPlayer3D.new()
+	var g2 = AudioStreamGenerator.new()
+	g2.mix_rate = MIX
+	g2.buffer_length = 0.12
+	sir_player.stream = g2
+	sir_player.unit_size = 14.0
+	sir_player.max_distance = 140.0
+	sir_player.volume_db = -6.0
+	add_child(sir_player)
+	sir_player.play()
+	sir_pb = sir_player.get_stream_playback()
+	amb_player = AudioStreamPlayer.new()
+	var g3 = AudioStreamGenerator.new()
+	g3.mix_rate = MIX
+	g3.buffer_length = 0.15
+	amb_player.stream = g3
+	amb_player.volume_db = -26.0
+	add_child(amb_player)
+	amb_player.play()
+	amb_pb = amb_player.get_stream_playback()
+
+
+func sfx(role: String, pos: Variant = null, vol = 0.0, pitch_var = 0.08) -> void:
+	var lst = snd_list(role)
+	if lst.is_empty() or snd_pool.is_empty():
+		return
+	var st = lst[randi() % lst.size()]
+	if pos == null:
+		var b: AudioStreamPlayer = snd_pool2d[snd_i % snd_pool2d.size()]
+		b.stream = st
+		b.volume_db = vol
+		b.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
+		b.play()
+	else:
+		var a: AudioStreamPlayer3D = snd_pool[snd_i % snd_pool.size()]
+		a.stream = st
+		a.volume_db = vol
+		a.pitch_scale = 1.0 + randf_range(-pitch_var, pitch_var)
+		a.global_position = pos
+		a.play()
+	snd_i += 1
+
+
+func gun_role(wid: String) -> String:
+	return {"p22": "tiro_pistola", "p9": "tiro_pistola", "smg": "tiro_smg", "sg": "tiro_cacadeira", "rf": "tiro_espingarda"}.get(wid, "tiro_pistola")
+
+
+func update_audio(dt: float) -> void:
+	if eng_pb == null:
+		return
+	# motor: harmónicas de um 4 cilindros, sobe com a velocidade e com o acelerador
+	var driving = P.get("in_car", false) and not inside and mode != "login"
+	var spd = absf(float(car.get("spd", 0.0))) if driving else 0.0
+	var target = (900.0 + spd * 160.0) if driving else 0.0
+	eng_rpm = lerpf(eng_rpm, target, minf(1.0, dt * 4.0))
+	var n = eng_pb.get_frames_available()
+	var f0 = eng_rpm / 60.0 * 2.0
+	var amp = clampf(eng_rpm / 900.0, 0.0, 1.0) * 0.32
+	for i in n:
+		eng_phase = fmod(eng_phase + f0 / MIX, 1.0)
+		var x = eng_phase * TAU
+		var v = (sin(x) * 0.6 + sin(x * 2.0) * 0.3 + sin(x * 0.5) * 0.45 + (randf() - 0.5) * 0.18) * amp
+		eng_pb.push_frame(Vector2(v, v))
+	# sirene: a polícia mais próxima (ou o teu carro-patrulha)
+	var src: Variant = null
+	var best = 999.0
+	if not inside:
+		for pp in police:
+			var d = dist(P, pp)
+			if d < best:
+				best = d
+				src = Vector3(pp["x"], 1.5, pp["y"])
+		if not duty.is_empty() and driving:
+			src = Vector3(car["x"], 1.5, car["y"])
+	var n2 = sir_pb.get_frames_available()
+	sir_t += dt
+	var on = src != null
+	if on:
+		sir_player.global_position = src
+	for i in n2:
+		var tt = sir_t + float(i) / MIX
+		var f = 700.0 + 550.0 * (0.5 + 0.5 * sin(tt * TAU / 3.2))   # "wail"
+		sir_phase = fmod(sir_phase + f / MIX, 1.0)
+		var v2 = 0.0
+		if on:
+			v2 = (absf(sir_phase * 2.0 - 1.0) * 2.0 - 1.0) * 0.35
+		sir_pb.push_frame(Vector2(v2, v2))
+	# ambiente da cidade: ruído grave filtrado (trânsito ao longe)
+	var n3 = amb_pb.get_frames_available()
+	var city = not inside and Z.get("kind", "") == "city"
+	for i in n3:
+		amb_lp += ((randf() - 0.5) - amb_lp) * 0.02
+		var v3 = amb_lp * (2.2 if city else 0.8)
+		amb_pb.push_frame(Vector2(v3, v3))
+	# passos
+	if mode == "play" and not P.get("in_car", false):
+		var mv = Vector2(float(P["x"]) - float(P.get("px", P["x"])), float(P["y"]) - float(P.get("py", P["y"]))).length() / maxf(dt, 0.001)
+		if mv > 1.0:
+			step_t -= dt * mv / 5.2
+			if step_t <= 0.0:
+				step_t = 0.36
+				sfx("passo", Vector3(P["x"], 0.3, P["y"]) if not inside else null, -12.0, 0.12)
 
 
 func story_advance() -> void:
