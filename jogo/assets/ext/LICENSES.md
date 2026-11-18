@@ -14,9 +14,9 @@
 | textura telhado | grey_roof_tiles_02 | https://polyhaven.com/a/grey_roof_tiles_02 | CC0 |
 | textura relva | aerial_grass_rock | https://polyhaven.com/a/aerial_grass_rock | CC0 |
 | textura areia | coast_sand_rocks_02 | https://polyhaven.com/a/coast_sand_rocks_02 | CC0 |
-| céu dia | the_sky_is_on_fire | https://polyhaven.com/a/the_sky_is_on_fire | CC0 |
-| céu tarde | venice_sunset | https://polyhaven.com/a/venice_sunset | CC0 |
-| céu noite | shanghai_bund | https://polyhaven.com/a/shanghai_bund | CC0 |
+| céu dia | kloofendal_48d_partly_cloudy_puresky | https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky | CC0 |
+| céu tarde | qwantani_dusk_2_puresky | https://polyhaven.com/a/qwantani_dusk_2_puresky | CC0 |
+| céu noite | kloppenheim_02_puresky | https://polyhaven.com/a/kloppenheim_02_puresky | CC0 |
 | modelo | potted_plant_02 | https://polyhaven.com/a/potted_plant_02 | CC0 |
 | modelo | potted_plant_04 | https://polyhaven.com/a/potted_plant_04 | CC0 |
 | modelo | sofa_02 | https://polyhaven.com/a/sofa_02 | CC0 |
