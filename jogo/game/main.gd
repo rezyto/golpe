@@ -211,6 +211,7 @@ func shots() -> void:
 		await tr.process_frame
 	await tr.create_timer(0.8).timeout
 	await shot("05_cidade_carro")
+	print("PERF cidade: draw calls ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), " objetos ", Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME), " nós ", Performance.get_monitor(Performance.OBJECT_NODE_COUNT), " fps ", Performance.get_monitor(Performance.TIME_FPS))
 	exit_car()
 	for vv in [[60.0, 100.0, 0.6], [150.0, 165.0, 2.4], [300.0, 100.0, -0.8], [205.0, 160.0, 1.57]]:
 		P["x"] = vv[0]
@@ -1748,6 +1749,59 @@ func tex_ground(kind: String) -> StandardMaterial3D:
 	return m
 
 
+func bake_static(root: Node3D) -> int:
+	## junta todas as malhas estáticas de um nó numa malha por material (menos chamadas de desenho no telemóvel)
+	var groups = {}
+	var mats = {}
+	var shad = {}
+	var kill = []
+	_bake_collect(root, Transform3D.IDENTITY, groups, mats, shad, kill)
+	if kill.size() < 2:
+		return 0
+	for n in kill:
+		n.get_parent().remove_child(n)
+		n.queue_free()
+	for k in groups.keys():
+		var mi = MeshInstance3D.new()
+		mi.mesh = groups[k].commit()
+		mi.material_override = mats[k]
+		mi.cast_shadow = shad[k]
+		root.add_child(mi)
+	return kill.size()
+
+
+func _bake_collect(node: Node, xf: Transform3D, groups: Dictionary, mats: Dictionary, shad: Dictionary, kill: Array) -> void:
+	for ch in node.get_children():
+		if not (ch is Node3D):
+			continue
+		var cxf: Transform3D = xf * ch.transform
+		if ch is MeshInstance3D and ch.mesh != null and ch.visible:
+			var mi: MeshInstance3D = ch
+			var ok = true
+			for i in mi.mesh.get_surface_count():
+				if mi.mesh.surface_get_primitive_type(i) != Mesh.PRIMITIVE_TRIANGLES:
+					ok = false
+			if ok and ch.get_child_count() == 0:
+				for i in mi.mesh.get_surface_count():
+					var m: Material = mi.material_override
+					if m == null:
+						m = mi.get_surface_override_material(i)
+					if m == null:
+						m = mi.mesh.surface_get_material(i)
+					var key = "%d|%d|%d" % [m.get_instance_id() if m != null else 0, mi.mesh.surface_get_format(i), int(mi.cast_shadow)]
+					if not groups.has(key):
+						var st = SurfaceTool.new()
+						st.begin(Mesh.PRIMITIVE_TRIANGLES)
+						groups[key] = st
+						mats[key] = m
+						shad[key] = mi.cast_shadow
+					groups[key].append_from(mi.mesh, i, cxf)
+				kill.append(ch)
+				continue
+		if ch is MeshInstance3D or ch.get_class() == "Node3D":
+			_bake_collect(ch, cxf, groups, mats, shad, kill)
+
+
 func place_proc_building(b: Dictionary, parent: Node3D, xf: Dictionary) -> void:
 	## prédio por andares: rés-do-chão com montra, andares com janelas, cornija, telhado com detalhes
 	var w: float = b["w"]
@@ -2410,7 +2464,13 @@ func build_world() -> void:
 			cr.visibility_range_end = vis
 			continue
 		if not b.get("main", false):
-			place_proc_building(b, world, cxf)
+			var bnode = Node3D.new()
+			world.add_child(bnode)
+			place_proc_building(b, bnode, cxf)
+			bake_static(bnode)
+			for gi in bnode.get_children():
+				if gi is MeshInstance3D:
+					gi.visibility_range_end = vis + 60.0
 			continue
 		var body = box(Vector3(w, hgt, d), tex_facade("reboco", b["col"]), Vector3(bcx, hgt / 2.0 + 0.25, bcz), world)
 		body.visibility_range_end = vis + 60.0
@@ -2437,6 +2497,7 @@ func build_world() -> void:
 	# carros estacionados
 	for q in Z["parked"]:
 		var pcar = make_simple_car(q["col"], world, Vector3(q["cx"], 0, q["cy"]), q["ang"])
+		bake_static(pcar)
 		set_vis_range(pcar, vis)
 	flush_city_instances(cxf, world)
 	# árvores (multimesh)
