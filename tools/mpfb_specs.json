@@ -1,0 +1,6 @@
+[
+  {"id": "homem_treino", "macro": {"gender": 1.0, "age": 0.45, "muscle": 0.6, "weight": 0.5}, "skin": ["young caucasian male", "male"], "hair": ["short02", "short"], "clothes": [["tshirt"], ["jeans", "pants"], ["sneaker", "shoes"]]},
+  {"id": "mulher_casual", "macro": {"gender": 0.0, "age": 0.4, "muscle": 0.5, "weight": 0.45}, "skin": ["young caucasian female", "female"], "hair": ["ponytail", "long"], "clothes": [["top", "shirt"], ["jeans", "pants"], ["shoes"]]},
+  {"id": "assaltante", "macro": {"gender": 1.0, "age": 0.5, "muscle": 0.7, "weight": 0.55}, "skin": ["middleage", "male"], "hair": [], "clothes": [["hoodie", "sweater", "shirt"], ["pants", "jeans"], ["boots", "shoes"], ["balaclava", "mask"]]},
+  {"id": "policia", "macro": {"gender": 1.0, "age": 0.5, "muscle": 0.65, "weight": 0.55}, "skin": ["african male", "male"], "hair": ["short04", "short"], "clothes": [["uniform", "shirt"], ["pants"], ["boots", "shoes"], ["cap", "hat"]]}
+]

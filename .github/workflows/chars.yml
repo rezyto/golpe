@@ -34,12 +34,32 @@ jobs:
           url=[l for l in links if "download" in l or l.endswith(".zip")][0]
           if url.startswith("/"): url="https://extensions.blender.org"+url
           open("mpfb.zip","wb").write(get(url))
-          ap=get("https://static.makehumancommunity.org/assets/assetpacks/index.html").decode()
-          packs=sorted(set(re.findall(r'href="([^"]+\.zip)"',ap)))
-          print("pacotes:",len(packs)); [print("  ",p) for p in packs[:80]]
-          open("packs.txt","w").write("\n".join(packs))
+          import zipfile, io, os
+          dest=os.path.expanduser("~/.config/blender/4.2/extensions/.user/user_default/mpfb/data")
+          os.makedirs(dest, exist_ok=True)
+          base="https://static.makehumancommunity.org/assets/assetpacks/"
+          for pk in ["makehuman_system_assets","skins01","skins02","hair01","eyebrows01","eyelashes01","pants01","shirts01","shoes01","suits01","suits02","hats01","hats02","masks01","glasses01","gloves01","equipment01"]:
+              try:
+                  html=get(base+pk+".html").decode()
+                  z=[l for l in re.findall(r'href="([^"]+\.zip)"',html)]
+                  if not z: print("sem zip",pk); continue
+                  u=z[0] if z[0].startswith("http") else base+z[0]
+                  data=get(u); zf=zipfile.ZipFile(io.BytesIO(data))
+                  names=zf.namelist(); print(pk, len(data)//1024, "KB", names[:3])
+                  zf.extractall(dest)
+              except Exception as e:
+                  print("falhou",pk,e)
           PY
           blender -b --command extension install-file -r user_default -e mpfb.zip || true
           ls ~/.config/blender/4.2/extensions/user_default/ || true
-      - name: Explorar API
-        run: blender -b --python tools/mpfb_probe.py 2>&1 | grep -E "ADDON|MODS|HS |LOC |AS |Error|error" | head -150
+      - name: Gerar personagens
+        run: |
+          blender -b --python tools/mpfb_gen.py -- jogo/game/chars/AnimationLibrary_Godot_Standard.gltf jogo/assets/ext/chars tools/mpfb_specs.json 2>&1 | grep -E "GEN|Error|error|Traceback|File \"" | head -200
+          ls -la jogo/assets/ext/chars || true
+      - name: Guardar
+        run: |
+          git config user.name "golpe-bot"
+          git config user.email "golpe-bot@users.noreply.github.com"
+          git add jogo/assets/ext/chars || true
+          git commit -m "Personagens MPFB2 gerados" || echo "nada"
+          git pull --rebase -q origin main && git push -q origin HEAD:main
