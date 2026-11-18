@@ -11,9 +11,6 @@
 | textura azulejo | floor_tiles_06 | https://polyhaven.com/a/floor_tiles_06 | CC0 |
 | textura metal | metal_plate | https://polyhaven.com/a/metal_plate | CC0 |
 | textura madeira | laminate_floor_02 | https://polyhaven.com/a/laminate_floor_02 | CC0 |
-| textura telhado | grey_roof_tiles_02 | https://polyhaven.com/a/grey_roof_tiles_02 | CC0 |
-| textura relva | aerial_grass_rock | https://polyhaven.com/a/aerial_grass_rock | CC0 |
-| textura areia | coast_sand_rocks_02 | https://polyhaven.com/a/coast_sand_rocks_02 | CC0 |
 | céu dia | kloofendal_48d_partly_cloudy_puresky | https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky | CC0 |
 | céu tarde | qwantani_dusk_2_puresky | https://polyhaven.com/a/qwantani_dusk_2_puresky | CC0 |
 | céu noite | kloppenheim_02_puresky | https://polyhaven.com/a/kloppenheim_02_puresky | CC0 |
