@@ -50,6 +50,7 @@ var act_lbl: Label
 var fire_panel: Panel
 var menu_panel: Panel
 var map_btn: Panel
+var cfg_btn: Panel
 var modal: Control
 var modal_title: Label
 var modal_body: VBoxContainer
@@ -211,6 +212,10 @@ func shots() -> void:
 		await tr.process_frame
 	await tr.create_timer(0.8).timeout
 	await shot("05_cidade_carro")
+	open_menu("Definições", menu_settings)
+	await tr.create_timer(0.3).timeout
+	await shot("05c_definicoes")
+	close_menu()
 	print("PERF cidade: draw calls ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), " objetos ", Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME), " nós ", Performance.get_monitor(Performance.OBJECT_NODE_COUNT), " fps ", Performance.get_monitor(Performance.TIME_FPS))
 	exit_car()
 	for vv in [[60.0, 100.0, 0.6], [150.0, 165.0, 2.4], [300.0, 100.0, -0.8], [205.0, 160.0, 1.57]]:
@@ -747,7 +752,7 @@ func now_ms() -> float:
 func default_save() -> Dictionary:
 	return {"ver": 4, "trunks": {}, "story": 0, "paid": 0, "tools": [], "ties": 0, "nick": "", "money": 5000, "xp": 0, "lvl": 1, "hp": 100.0, "weapon": "p22", "weapons": ["p22"],
 		"car": "pardal", "cars": ["pardal"], "car_hp": 100.0, "bag": "b10", "bags": ["b10"], "props": {}, "terr": {},
-		"inv": [], "wash": [], "clock": 10.0, "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
+		"inv": [], "wash": [], "clock": 10.0, "cfg": {"q": 1, "sfx": 0.8, "mus": 0.5, "sens": 1.0, "shake": true, "fps": 60, "vib": true}, "cds": {}, "pending": 0.0, "last": now_ms(), "mission": {},
 		"stats": {"heists": 0, "busted": 0, "earned": 0, "hospital": 0}}
 
 
@@ -919,7 +924,7 @@ func fmt(n) -> String:
 	while s.length() > 3:
 		out = " " + s.substr(s.length() - 3) + out
 		s = s.substr(0, s.length() - 3)
-	return ("-" if neg else "") + "$" + s + out
+	return ("-" if neg else "") + s + out + " €"
 
 
 func mmss(ms: float) -> String:
@@ -2672,6 +2677,7 @@ func enter_place(id: String) -> void:
 	add_child(car["mesh"])
 	Z["spawn"] = {"x": P["x"], "y": P["y"]}
 	build_world()
+	apply_cfg()
 	lbl_zone.text = Z["name"]
 	snap_cam = true
 	mode = "play"
@@ -4539,6 +4545,8 @@ func hud_hit(pos: Vector2) -> String:
 		return "act"
 	if menu_panel.get_global_rect().grow(6).has_point(pos):
 		return "menu"
+	if cfg_btn.get_global_rect().grow(6).has_point(pos):
+		return "cfg"
 	if map_btn.get_global_rect().grow(6).has_point(pos) or minimap.get_global_rect().has_point(pos):
 		return "map"
 	for i in slot_panels.size():
@@ -4600,6 +4608,8 @@ func _pointer(id: int, pos: Vector2, pressed: bool) -> void:
 			open_inventory()
 		elif h == "map":
 			open_fullmap()
+		elif h == "cfg":
+			open_menu("Definições", menu_settings)
 		elif h.begins_with("slot"):
 			var i = int(h.substr(4))
 			if i < S["weapons"].size():
@@ -4626,7 +4636,7 @@ func _drag(id: int, pos: Vector2) -> void:
 		joy["pos"] = pos
 	if not cam_drag.is_empty() and cam_drag["id"] == id:
 		var dx: float = pos.x - cam_drag["last"].x
-		cam_yaw -= dx * 0.0075
+		cam_yaw -= dx * 0.0075 * float(cfg("sens"))
 		cam_drag["last"] = pos
 
 
@@ -5289,7 +5299,7 @@ func update_act_button() -> void:
 		act_panel.visible = not a.is_empty()
 		act_lbl.text = lab
 		var on = a.has("f")
-		act_panel.add_theme_stylebox_override("panel", circle_style(Color(0.11, 0.12, 0.15, 0.85), GOLD if on else LINE))
+		act_panel.add_theme_stylebox_override("panel", circle_style(Color(0, 0, 0, 0.35) if on else Color(0, 0, 0, 0.22), GOLD if on else Color(1, 1, 1, 0.35), 46))
 		act_lbl.add_theme_color_override("font_color", GOLD if on else DIM)
 
 
@@ -5431,7 +5441,7 @@ func render(dt: float) -> void:
 	cam.position = cam_p
 	cam.look_at(focus, Vector3.UP)
 	if cam_shake > 0.0:
-		cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * cam_shake * 0.35
+		cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * cam_shake * 0.35 * (1.0 if cfg("shake") else 0.0)
 		cam_shake = maxf(0.0, cam_shake - dt * 2.5)
 	if cam_dbg != Vector3.ZERO:
 		cam.position = Vector3(P["x"], 0, P["y"]) + cam_dbg
@@ -5576,6 +5586,62 @@ func hud_panel(x_anchor: float, x: float, y: float, w: float, h: float) -> Panel
 	return p
 
 
+func hud_text(text: String, size: int, col: Color) -> Label:
+	var l = lbl(text, size, col)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	l.add_theme_constant_override("shadow_offset_x", 1)
+	l.add_theme_constant_override("shadow_offset_y", 1)
+	return l
+
+
+func icon_btn(kind: String, rad = 22) -> Panel:
+	## botão redondo translúcido com ícone desenhado (sem texto)
+	var p = Panel.new()
+	p.add_theme_stylebox_override("panel", circle_style(Color(0, 0, 0, 0.32), Color(1, 1, 1, 0.5), rad))
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ic = Control.new()
+	full(ic)
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ic.draw.connect(func(): _draw_glyph(ic, kind))
+	p.add_child(ic)
+	return p
+
+
+func _draw_glyph(c: Control, kind: String) -> void:
+	var sz = c.size
+	var o = sz / 2.0
+	var r = minf(sz.x, sz.y) * 0.5
+	var w = Color(1, 1, 1, 0.92)
+	if kind == "fire":
+		c.draw_arc(o, r * 0.42, 0, TAU, 40, w, 3.0, true)
+		for a in [0.0, PI / 2, PI, PI * 1.5]:
+			var d = Vector2(cos(a), sin(a))
+			c.draw_line(o + d * r * 0.22, o + d * r * 0.62, w, 3.0, true)
+		c.draw_circle(o, 3.0, w)
+	elif kind == "map":
+		var pts = PackedVector2Array([o + Vector2(-r * 0.5, -r * 0.38), o + Vector2(-r * 0.17, -r * 0.5), o + Vector2(r * 0.17, -r * 0.38), o + Vector2(r * 0.5, -r * 0.5),
+			o + Vector2(r * 0.5, r * 0.38), o + Vector2(r * 0.17, r * 0.5), o + Vector2(-r * 0.17, r * 0.38), o + Vector2(-r * 0.5, r * 0.5)])
+		pts.append(pts[0])
+		c.draw_polyline(pts, w, 2.0, true)
+		c.draw_line(o + Vector2(-r * 0.17, -r * 0.5), o + Vector2(-r * 0.17, r * 0.38), w, 1.5, true)
+		c.draw_line(o + Vector2(r * 0.17, -r * 0.38), o + Vector2(r * 0.17, r * 0.5), w, 1.5, true)
+	elif kind == "bag":
+		c.draw_rect(Rect2(o + Vector2(-r * 0.42, -r * 0.18), Vector2(r * 0.84, r * 0.64)), w, false, 2.0)
+		c.draw_arc(o + Vector2(0, -r * 0.18), r * 0.22, PI, TAU, 16, w, 2.0, true)
+		c.draw_line(o + Vector2(-r * 0.42, r * 0.06), o + Vector2(r * 0.42, r * 0.06), w, 1.5, true)
+	elif kind == "gear":
+		c.draw_arc(o, r * 0.2, 0, TAU, 20, w, 2.0, true)
+		c.draw_arc(o, r * 0.38, 0, TAU, 28, w, 2.0, true)
+		for k in 8:
+			var a = k * TAU / 8.0
+			var d = Vector2(cos(a), sin(a))
+			c.draw_line(o + d * r * 0.38, o + d * r * 0.52, w, 3.5, true)
+	elif kind == "menu":
+		for k in 3:
+			var y = o.y + (k - 1) * r * 0.32
+			c.draw_line(Vector2(o.x - r * 0.42, y), Vector2(o.x + r * 0.42, y), w, 2.5, true)
+
+
 func round_btn(text: String, size: int, col: Color, bg: Color, border: Color) -> Panel:
 	var p = Panel.new()
 	p.add_theme_stylebox_override("panel", circle_style(bg, border))
@@ -5603,67 +5669,55 @@ func setup_ui() -> void:
 	hud.theme = th
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(hud)
+	# HUD discreto: minimapa pequeno em cima à esquerda, estado por baixo, vida em baixo à esquerda
 	minimap = Control.new()
-	place(minimap, 0, 0, 14, 12, 230, 170)
+	place(minimap, 0, 0, 16, 14, 196, 168)
 	minimap.clip_contents = true
 	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap.draw.connect(_draw_minimap)
 	hud.add_child(minimap)
-	var mp = hud_panel(0, 254, 12, 150, 46)
-	lbl_money = lbl("$0", 24, GOLD)
-	mp.add_child(lbl_money)
-	hud.add_child(mp)
-	var lp = hud_panel(0, 254, 64, 150, 50)
-	var lv = VBoxContainer.new()
-	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lbl_lvl = lbl("Nível 1", 14, DIM)
-	lv.add_child(lbl_lvl)
-	bar_xp = pbar(GOLD, 124)
-	lv.add_child(bar_xp)
-	lp.add_child(lv)
-	hud.add_child(lp)
-	var rp = hud_panel(1, -340, 12, 200, 66)
-	var rv = VBoxContainer.new()
-	rv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rv.add_theme_constant_override("separation", 4)
-	lbl_bag = lbl("Saco 0/10kg", 14, DIM)
-	rv.add_child(lbl_bag)
-	bar_hp = pbar(OK_C, 176)
-	rv.add_child(bar_hp)
-	bar_car = pbar(Color("#4a8fe0"), 176)
-	rv.add_child(bar_car)
-	rp.add_child(rv)
-	hud.add_child(rp)
-	map_btn = Panel.new()
-	map_btn.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.85), 8))
-	map_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	place(map_btn, 1, 0, -132, 12, 58, 58)
-	var mpl = lbl("MAPA", 14)
-	mpl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mpl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	full(mpl)
-	map_btn.add_child(mpl)
+	var st = VBoxContainer.new()
+	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	st.add_theme_constant_override("separation", 1)
+	place(st, 0, 0, 18, 188, 196, 60)
+	lbl_money = hud_text("0 €", 21, GOLD)
+	st.add_child(lbl_money)
+	lbl_lvl = hud_text("Nível 1", 13, Color(1, 1, 1, 0.75))
+	st.add_child(lbl_lvl)
+	bar_xp = pbar(GOLD, 150, 3)
+	st.add_child(bar_xp)
+	hud.add_child(st)
+	# vida / carro (em baixo à esquerda)
+	var vit = VBoxContainer.new()
+	vit.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vit.add_theme_constant_override("separation", 3)
+	place(vit, 0, 1, 18, -74, 230, 60)
+	lbl_bag = hud_text("Mochila 0 / 15", 13, Color(1, 1, 1, 0.8))
+	vit.add_child(lbl_bag)
+	bar_hp = pbar(Color("#5fd38a"), 220, 6)
+	vit.add_child(bar_hp)
+	bar_car = pbar(Color("#5aa0e0"), 220, 4)
+	vit.add_child(bar_car)
+	hud.add_child(vit)
+	map_btn = icon_btn("map")
+	place(map_btn, 1, 0, -112, 14, 44, 44)
 	hud.add_child(map_btn)
-	menu_panel = Panel.new()
-	menu_panel.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.85), 8))
-	menu_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	place(menu_panel, 1, 0, -68, 12, 58, 58)
-	var ml = lbl("≡", 32)
-	ml.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ml.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	full(ml)
-	menu_panel.add_child(ml)
+	menu_panel = icon_btn("bag")
+	place(menu_panel, 1, 0, -60, 14, 44, 44)
 	hud.add_child(menu_panel)
+	cfg_btn = icon_btn("gear")
+	place(cfg_btn, 1, 0, -164, 14, 44, 44)
+	hud.add_child(cfg_btn)
 	lbl_zone = lbl("", 15, DIM)
 	lbl_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	place(lbl_zone, 0.5, 0, -250, 96, 500, 22)
 	lbl_zone.visible = false
 	hud.add_child(lbl_zone)
-	lbl_speed = lbl("", 46, Color.WHITE)
+	lbl_speed = lbl("", 30, Color.WHITE)
 	lbl_speed.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	lbl_speed.add_theme_constant_override("shadow_offset_x", 2)
 	lbl_speed.add_theme_constant_override("shadow_offset_y", 2)
-	place(lbl_speed, 0, 1, 28, -96, 260, 70)
+	place(lbl_speed, 0, 1, 18, -122, 260, 44)
 	hud.add_child(lbl_speed)
 	lbl_duty = lbl("", 22, Color("#9cc4ff"))
 	lbl_duty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5691,21 +5745,21 @@ func setup_ui() -> void:
 	feed_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	feed_box.alignment = BoxContainer.ALIGNMENT_END
 	feed_box.add_theme_constant_override("separation", 2)
-	place(feed_box, 0, 0.5, 16, -10, 420, 160)
+	place(feed_box, 0, 0.5, 16, 10, 380, 150)
 	hud.add_child(feed_box)
 	hotbar = HBoxContainer.new()
 	hotbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hotbar.add_theme_constant_override("separation", 8)
 	hotbar.alignment = BoxContainer.ALIGNMENT_CENTER
-	place(hotbar, 0.5, 1, -260, -88, 520, 72)
+	place(hotbar, 0.5, 1, -220, -62, 440, 52)
 	hud.add_child(hotbar)
-	fire_panel = round_btn("DISPARAR", 19, Color("#ecebe6"), Color(0.33, 0.1, 0.08, 0.85), Color("#8b2f28"))
-	fire_panel.add_theme_stylebox_override("panel", circle_style(Color(0.33, 0.1, 0.08, 0.85), Color("#8b2f28"), 69))
-	place(fire_panel, 1, 1, -166, -166, 140, 140)
+	fire_panel = icon_btn("fire", 56)
+	place(fire_panel, 1, 1, -150, -150, 112, 112)
 	hud.add_child(fire_panel)
-	act_panel = round_btn("—", 16, DIM, Color(0.11, 0.12, 0.15, 0.85), LINE)
+	act_panel = round_btn("—", 14, Color.WHITE, Color(0, 0, 0, 0.35), Color(1, 1, 1, 0.55))
+	act_panel.add_theme_stylebox_override("panel", circle_style(Color(0, 0, 0, 0.35), Color(1, 1, 1, 0.55), 46))
 	act_lbl = act_panel.get_child(0)
-	place(act_panel, 1, 1, -300, -250, 118, 118)
+	place(act_panel, 1, 1, -262, -212, 92, 92)
 	hud.add_child(act_panel)
 	overlay = Control.new()
 	full(overlay)
@@ -5991,17 +6045,20 @@ func refresh_hotbar() -> void:
 		var w = find_by_id(D.WEAPONS, wid)
 		var eq = S["weapon"] == wid
 		var p = PanelContainer.new()
-		p.custom_minimum_size = Vector2(96, 66)
+		p.custom_minimum_size = Vector2(78, 48)
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		p.add_theme_stylebox_override("panel", flat(Color(0.18, 0.3, 0.12, 0.9) if eq else Color(0.08, 0.09, 0.11, 0.8), 6, Color("#9ad04a") if eq else LINE, 2 if eq else 1))
+		var sb = flat(Color(1, 1, 1, 0.14) if eq else Color(0, 0, 0, 0.3), 3, Color(1, 1, 1, 0.85) if eq else Color(1, 1, 1, 0.18), 1)
+		sb.content_margin_top = 4
+		sb.content_margin_bottom = 4
+		p.add_theme_stylebox_override("panel", sb)
 		var v = VBoxContainer.new()
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var nm: String = w["name"]
 		var short = nm.split(" ")[0] + " " + nm.split(" ")[nm.split(" ").size() - 1]
-		var a = lbl(short, 13, Color("#ecebe6"))
+		var a = hud_text(short, 12, Color("#ffffff"))
 		a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(a)
-		var b = lbl(str(i + 1), 12, DIM)
+		var b = hud_text(str(i + 1), 10, Color(1, 1, 1, 0.55))
 		b.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(b)
 		p.add_child(v)
@@ -6075,8 +6132,9 @@ func _draw_overlay() -> void:
 	# bússola
 	var cx = vs.x / 2.0
 	var heading = fposmod(-rad_to_deg(cam_yaw), 360.0)
-	var cw = 420.0
-	overlay.draw_rect(Rect2(cx - cw / 2.0, 10, cw, 30), Color(0.05, 0.06, 0.07, 0.55))
+	var cw = 360.0
+	# bússola fina, sem caixa, com fade nas pontas
+	overlay.draw_line(Vector2(cx - cw / 2.0, 34), Vector2(cx + cw / 2.0, 34), Color(1, 1, 1, 0.18), 1.0)
 	var names = {0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S", 225: "SO", 270: "O", 315: "NO"}
 	for deg in range(0, 360, 15):
 		var dd = ang_diff(deg_to_rad(float(deg)), deg_to_rad(heading))
@@ -6085,23 +6143,29 @@ func _draw_overlay() -> void:
 			continue
 		if names.has(deg):
 			var big = deg % 90 == 0
-			overlay.draw_string(font, Vector2(x - 20, 32), names[deg], HORIZONTAL_ALIGNMENT_CENTER, 40, 18 if big else 14, Color("#ffffff") if big else Color("#c9c9c9"))
+			var fa = 1.0 - absf(x - cx) / (cw / 2.0)
+			overlay.draw_string(font, Vector2(x - 20 + 1, 29), names[deg], HORIZONTAL_ALIGNMENT_CENTER, 40, 15 if big else 12, Color(0, 0, 0, 0.6 * fa))
+			overlay.draw_string(font, Vector2(x - 20, 28), names[deg], HORIZONTAL_ALIGNMENT_CENTER, 40, 15 if big else 12, Color(1, 1, 1, (1.0 if big else 0.7) * fa))
 		else:
-			overlay.draw_line(Vector2(x, 20), Vector2(x, 30), Color(1, 1, 1, 0.5), 1.5)
-	overlay.draw_line(Vector2(cx, 6), Vector2(cx, 14), GOLD, 3.0)
+			var fa2 = 1.0 - absf(x - cx) / (cw / 2.0)
+			overlay.draw_line(Vector2(x, 26), Vector2(x, 33), Color(1, 1, 1, 0.45 * fa2), 1.0)
+	overlay.draw_line(Vector2(cx, 10), Vector2(cx, 16), GOLD, 2.0)
 	# objetivo (waypoint) na bússola
 	if not waypoint.is_empty() and not inside:
 		var wa = atan2(waypoint["x"] - P["x"], -(waypoint["y"] - P["y"]))
 		var wd = ang_diff(wa, deg_to_rad(heading))
 		var wx = cx + clampf(rad_to_deg(wd) * 3.2, -cw / 2.0 + 8, cw / 2.0 - 8)
-		overlay.draw_circle(Vector2(wx, 44), 5.0, GOLD)
+		overlay.draw_circle(Vector2(wx, 40), 4.0, GOLD)
 	# estrelas
-	var sx = cx - 2.0 * 34.0
+	# estrelas só aparecem quando és procurado
+	var sx = cx - 2.0 * 22.0
 	for i in 5:
+		if wanted == 0:
+			break
 		var on = i < wanted
-		var col = (RED if int(t * 3) % 2 == 0 else GOLD) if on else Color(0.27, 0.29, 0.33, 0.8)
-		overlay.draw_colored_polygon(star_pts(Vector2(sx + i * 34.0 + 2, 72.0), 13.0), Color(0, 0, 0, 0.5))
-		overlay.draw_colored_polygon(star_pts(Vector2(sx + i * 34.0, 70.0), 13.0), col)
+		var col = (RED if int(t * 3) % 2 == 0 else Color("#ffffff")) if on else Color(1, 1, 1, 0.18)
+		overlay.draw_colored_polygon(star_pts(Vector2(sx + i * 22.0 + 1, 57.0), 8.0), Color(0, 0, 0, 0.45))
+		overlay.draw_colored_polygon(star_pts(Vector2(sx + i * 22.0, 56.0), 8.0), col)
 	if mode != "play":
 		return
 	# seta para o destino marcado
@@ -6181,6 +6245,7 @@ func _draw_minimap() -> void:
 	if Z.is_empty() or mode == "login":
 		return
 	var sz = minimap.size
+	minimap.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.1, 0.11, 0.13, 0.75))
 	if inside:
 		minimap.draw_rect(Rect2(Vector2.ZERO, sz), Color("#1b1c1f"))
 		var s2 = minf((sz.x - 20) / float(I["w"]), (sz.y - 20) / float(I["d"]))
@@ -6214,8 +6279,8 @@ func _draw_minimap() -> void:
 			var wp = to_scr.call(Vector2(waypoint["x"], waypoint["y"]))
 			wp = Vector2(clampf(wp.x, 6, sz.x - 6), clampf(wp.y, 6, sz.y - 6))
 			minimap.draw_circle(wp, 6.0, GOLD)
-		_draw_player_arrow(minimap, center, P["ang"], 10.0)
-	minimap.draw_rect(Rect2(Vector2.ZERO, sz), Color(0, 0, 0, 0.9), false, 3.0)
+		_draw_player_arrow(minimap, center, P["ang"], 9.0)
+	minimap.draw_rect(Rect2(Vector2.ZERO, sz), Color(1, 1, 1, 0.35), false, 1.0)
 
 
 func open_fullmap() -> void:
@@ -7100,6 +7165,92 @@ func menu_wash(box: VBoxContainer) -> void:
 				add_money(int(ww["net"]))
 				toast("+" + fmt(ww["net"]) + " no cofre", GOLD), "o", left > 0, "cash")
 			i += 1
+
+
+const CFG_DEFAULT = {"q": 1, "sfx": 0.8, "mus": 0.5, "sens": 1.0, "shake": true, "fps": 60, "vib": true}
+
+
+func cfg(k: String) -> Variant:
+	if S.is_empty() or not S.has("cfg"):
+		return CFG_DEFAULT[k]
+	return S["cfg"].get(k, CFG_DEFAULT[k])
+
+
+func set_cfg(k: String, v) -> void:
+	if not S.has("cfg"):
+		S["cfg"] = CFG_DEFAULT.duplicate()
+	S["cfg"][k] = v
+	apply_cfg()
+
+
+func apply_cfg() -> void:
+	## aplica as definições: qualidade gráfica, fps e volume
+	var q = int(cfg("q"))
+	var vp = get_viewport()
+	vp.scaling_3d_scale = [0.7, 0.85, 1.0][q]
+	if sun:
+		sun.shadow_enabled = q > 0
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if q < 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+		sun.directional_shadow_max_distance = [30.0, 42.0, 60.0][q]
+	if env_main:
+		env_main.glow_enabled = q > 0
+		env_main.fog_enabled = q > 0
+	Engine.max_fps = int(cfg("fps"))
+	var b = AudioServer.get_bus_index("Master")
+	AudioServer.set_bus_volume_db(b, linear_to_db(maxf(0.001, float(cfg("sfx")))))
+
+
+func choice_row(box: VBoxContainer, title: String, opts: Array, cur: int, cb: Callable) -> void:
+	var h = HBoxContainer.new()
+	h.add_theme_constant_override("separation", 6)
+	var l = lbl(title, 17)
+	l.custom_minimum_size = Vector2(230, 0)
+	h.add_child(l)
+	for i in opts.size():
+		var idx = i
+		var b = ui_button(str(opts[i]), func():
+			cb.call(idx)
+			refresh_menu(), "g" if i == cur else "")
+		b.custom_minimum_size = Vector2(110, 40)
+		h.add_child(b)
+	box.add_child(h)
+
+
+func slider_row(box: VBoxContainer, title: String, v: float, lo: float, hi: float, cb: Callable) -> void:
+	var h = HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	var l = lbl(title, 17)
+	l.custom_minimum_size = Vector2(230, 0)
+	h.add_child(l)
+	var sl = HSlider.new()
+	sl.min_value = lo
+	sl.max_value = hi
+	sl.step = (hi - lo) / 20.0
+	sl.value = v
+	sl.custom_minimum_size = Vector2(300, 36)
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var vl = lbl("%d%%" % int(round(v / hi * 100.0)), 16, DIM)
+	sl.value_changed.connect(func(x):
+		vl.text = "%d%%" % int(round(x / hi * 100.0))
+		cb.call(x))
+	h.add_child(sl)
+	h.add_child(vl)
+	box.add_child(h)
+
+
+func menu_settings(box: VBoxContainer) -> void:
+	h3(box, "Gráficos")
+	choice_row(box, "Qualidade", ["Baixa", "Média", "Alta"], int(cfg("q")), func(i): set_cfg("q", i))
+	choice_row(box, "Fotogramas", ["30 fps", "60 fps"], 0 if int(cfg("fps")) == 30 else 1, func(i): set_cfg("fps", [30, 60][i]))
+	choice_row(box, "Tremer câmara", ["Não", "Sim"], 1 if cfg("shake") else 0, func(i): set_cfg("shake", i == 1))
+	h3(box, "Som")
+	slider_row(box, "Efeitos", float(cfg("sfx")), 0.0, 1.0, func(x): set_cfg("sfx", x))
+	slider_row(box, "Música", float(cfg("mus")), 0.0, 1.0, func(x): set_cfg("mus", x))
+	h3(box, "Controlos")
+	slider_row(box, "Sensibilidade da câmara", float(cfg("sens")), 0.3, 2.0, func(x): set_cfg("sens", x))
+	choice_row(box, "Vibração", ["Não", "Sim"], 1 if cfg("vib") else 0, func(i): set_cfg("vib", i == 1))
+	h3(box, "Conta")
+	note(box, "Jogador: %s  ·  versão %s (app %s)" % [str(S.get("nick", "")), str(Engine.get_meta("content_version", "?")), str(Engine.get_meta("app_version", "?"))])
 
 
 func story_advance() -> void:
