@@ -1799,6 +1799,22 @@ func tex_ground(kind: String) -> StandardMaterial3D:
 	return m
 
 
+func bake_chunks(root: Node3D, cell: float) -> void:
+	## agrupa os filhos por zonas e funde cada zona (menos chamadas de desenho, mantém o recorte por zona)
+	var chunks = {}
+	for ch in root.get_children():
+		if not (ch is Node3D):
+			continue
+		var k = Vector2i(int(floor(ch.position.x / cell)), int(floor(ch.position.z / cell)))
+		if not chunks.has(k):
+			var cn = Node3D.new()
+			root.add_child(cn)
+			chunks[k] = cn
+		ch.reparent(chunks[k], true)
+	for k in chunks:
+		bake_static(chunks[k])
+
+
 func bake_static(root: Node3D) -> int:
 	## junta todas as malhas estáticas de um nó numa malha por material (menos chamadas de desenho no telemóvel)
 	var groups = {}
@@ -2491,7 +2507,13 @@ func build_world() -> void:
 		bulbs = []
 		var rr0 = RandomNumberGenerator.new()
 		rr0.seed = hash(Z["id"]) + 99
+		var sp_root = Node3D.new()
+		world.add_child(sp_root)
+		var w0 = world
+		world = sp_root
 		place_street_props(rr0)
+		world = w0
+		bake_chunks(sp_root, 70.0)
 	var pc = CylinderMesh.new()
 	pc.top_radius = 0.07
 	pc.bottom_radius = 0.09
@@ -2634,6 +2656,7 @@ func build_street_machine(p: Dictionary) -> void:
 		box(Vector3(0.3, 0.03, 0.06), mat("#0c0d0f"), Vector3(0, 0.84, 0.37), g, false)
 		box(Vector3(0.9, 0.22, 0.05), unshaded(Color("#2b6fd6")), Vector3(0, 2.05, 0.15), g, false)
 		p["node"] = g
+	bake_static(g)
 
 
 func make_ring(pos: Vector3, r_in: float, r_out: float, col: Color) -> MeshInstance3D:
