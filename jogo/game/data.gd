@@ -150,6 +150,16 @@ const DUTY_SALARY := 6000
 const DUTY_BONUS := 3500
 const DUTY_COOLDOWN_MIN := 15
 const DUTY_MAX_SUSPECTS := 3
+## encomendas perdidas: aparecem ao acaso na cidade, com itens aleatórios; os rivais também as querem
+const DROP_EVERY := [70.0, 130.0]
+const DROP_LIFE := 150.0
+const DROP_LOOT := [
+	{"cash": [500, 3000]},
+	{"id": "relogio", "ch": 0.35, "q": [1, 2]}, {"id": "anel", "ch": 0.3, "q": [1, 2]}, {"id": "colar", "ch": 0.2, "q": [1, 1]},
+	{"id": "lingote", "ch": 0.08, "q": [1, 1]}, {"id": "portatil", "ch": 0.3, "q": [1, 1]}, {"id": "tablet", "ch": 0.3, "q": [1, 1]},
+	{"id": "medicamentos", "ch": 0.35, "q": [1, 3]}, {"id": "kit_medico", "ch": 0.25, "q": [1, 1]}, {"id": "champanhe", "ch": 0.25, "q": [1, 2]},
+	{"id": "estatueta", "ch": 0.08, "q": [1, 1]}, {"id": "sujo", "ch": 0.3, "q": [1, 1]},
+]
 const WASH_FEE := 0.25
 const WASH_MAX := 60000
 const WASH_MIN_PER_10K := 1.0   # minutos de espera por cada 10 000 lavados

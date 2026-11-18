@@ -123,6 +123,8 @@ var lbl_speed: Label
 var lbl_duty: Label
 var duty = {}        # turno de polícia em curso
 var suspects = []    # suspeitos a fugir durante o turno
+var drops = []       # encomendas perdidas na cidade
+var drop_t = 40.0
 var panic_t = 0.0
 var stand_pivot: Node3D
 var stand_sel = ""
@@ -599,6 +601,27 @@ func autotest() -> void:
 	var m0 = int(S["money"])
 	end_duty(false)
 	print("autotest: fim do turno +", int(S["money"]) - m0, " carro ok ", is_instance_valid(car["mesh"]))
+	spawn_drop()
+	if drops.size() > 0:
+		var dr0 = drops[drops.size() - 1]
+		P["x"] = dr0["x"] + 0.6
+		P["y"] = dr0["y"]
+		await tr.process_frame
+		var lab3 = ctx_action().get("l", "")
+		do_action()
+		if not search.is_empty():
+			search["t"] = 999.0
+		await tr.process_frame
+		await tr.process_frame
+		var got3 = []
+		if mode == "loot":
+			for it in loot_c["items"]:
+				got3.append(it["id"])
+			close_loot()
+		print("autotest: encomenda botao ", lab3, " loot ", got3, " restantes ", drops.size())
+	for g in gang:
+		g["mesh"].queue_free()
+	gang = []
 	open_shop("stand")
 	await tr.process_frame
 	stand_sel = "furia"
@@ -2475,6 +2498,11 @@ func make_ring(pos: Vector3, r_in: float, r_out: float, col: Color) -> MeshInsta
 func free_entities() -> void:
 	if not duty.is_empty():
 		end_duty(false)
+	for dr in drops:
+		if is_instance_valid(dr["node"]):
+			dr["node"].queue_free()
+	drops = []
+	drop_t = 40.0
 	for p in police:
 		p["mesh"].queue_free()
 	for g in gang:
@@ -3188,6 +3216,89 @@ func outdoor_action(p: Dictionary) -> Dictionary:
 		if has_tool("pe_cabra"):
 			return {"l": "ARROMBAR", "f": func(): search = {"kind": "rear", "ref": ref, "t": 0.0, "need": 3.5, "label": "A ARROMBAR A PORTA DAS TRASEIRAS"}}
 		return {"l": "PRECISAS\nFERRAMENTA", "off": true}
+	return {}
+
+
+func spawn_drop() -> void:
+	var v = road_point_near(55.0, 140.0, randf() < 0.5)
+	if v.x < 0:
+		return
+	var side = 1.0 if randf() < 0.5 else -1.0
+	var horiz = false
+	for y in Z["ry"]:
+		if absf(v.y - float(y)) < 0.5:
+			horiz = true
+	var pos = v + (Vector2(0, side * (float(Z["rw"]) + 1.0)) if horiz else Vector2(side * (float(Z["rw"]) + 1.0), 0))
+	var g = Node3D.new()
+	g.position = Vector3(pos.x, 0.25, pos.y)
+	g.rotation.y = randf() * TAU
+	world.add_child(g)
+	box(Vector3(0.9, 0.6, 0.7), mat("#8a6a3e", 0.9), Vector3(0, 0.3, 0), g)
+	box(Vector3(0.92, 0.08, 0.72), mat("#d9c9a0", 0.9), Vector3(0, 0.45, 0), g, false)
+	box(Vector3(0.12, 0.62, 0.72), mat("#3a6aa8", 0.7), Vector3(0, 0.3, 0), g, false)
+	var beacon = OmniLight3D.new()
+	beacon.light_color = GOLD
+	beacon.light_energy = 1.4
+	beacon.omni_range = 4.0
+	beacon.position = Vector3(0, 1.2, 0)
+	g.add_child(beacon)
+	var dr = {"x": pos.x, "y": pos.y, "life": D.DROP_LIFE, "node": g, "ring": make_ring(Vector3(pos.x, 0.35, pos.y), 1.0, 1.3, GOLD)}
+	drops.append(dr)
+	feed_add("Encomenda perdida na rua — marcada no mapa", GOLD)
+	if randf() < 0.4:
+		toast("Rivais também viram a encomenda!", RED)
+		for k in 2:
+			var rp = road_point_near(18.0, 30.0, randf() < 0.5)
+			if rp.x < 0:
+				continue
+			var gm = make_char("Rogue_Hooded", true, "#8a3a3a")
+			add_child(gm)
+			gang.append({"x": pos.x + randf_range(-25, 25), "y": pos.y + randf_range(-25, 25), "hp": 40.0, "cd": randf_range(0.8, 1.6), "ang": 0.0, "mesh": gm, "phase": 0.0, "terr": ""})
+
+
+func remove_drop(dr: Dictionary) -> void:
+	if is_instance_valid(dr["node"]):
+		dr["node"].queue_free()
+	if is_instance_valid(dr["ring"]):
+		rings.erase(dr["ring"])
+		dr["ring"].queue_free()
+	drops.erase(dr)
+
+
+func update_drops(dt: float) -> void:
+	drop_t -= dt
+	if drop_t <= 0.0:
+		drop_t = randf_range(D.DROP_EVERY[0], D.DROP_EVERY[1])
+		if drops.size() < 2 and duty.is_empty():
+			spawn_drop()
+	for dr in drops.duplicate():
+		dr["life"] = float(dr["life"]) - dt
+		if float(dr["life"]) <= 0.0:
+			feed_add("Alguém levou a encomenda", RED)
+			remove_drop(dr)
+	if not search.is_empty() and search["kind"] == "drop":
+		var sd = search["d"]
+		if not P["in_car"] and drops.has(sd) and dist(P, sd) < 2.4:
+			search["t"] = search["t"] + dt
+			if search["t"] >= search["need"]:
+				search = {}
+				remove_drop(sd)
+				var c = {"n": "Encomenda perdida", "items": [], "dims": [5, 4]}
+				for st in roll_loot(D.DROP_LOOT):
+					grid_add(c["items"], 5, 4, st)
+				for it in c["items"]:
+					it["hid"] = true
+					it["rev"] = 0.0
+				last_act = "?"
+				open_loot(c)
+		else:
+			search = {}
+
+
+func near_drop(r: float) -> Dictionary:
+	for dr in drops:
+		if dist(P, dr) < r:
+			return dr
 	return {}
 
 
@@ -3993,7 +4104,10 @@ func roll_loot(table: Array) -> Array:
 			if int(S["story"]) == int(L["chapter"]) and count_item(L["story_item"]) == 0:
 				out.append({"id": L["story_item"], "q": 1})
 		elif randf() < float(L["ch"]):
-			out.append({"id": L["id"], "q": randi_range(L["q"][0], L["q"][1])})
+			if L["id"] == "sujo":
+				out.append({"id": "sujo", "v": randi_range(10, 40) * 100})
+			else:
+				out.append({"id": L["id"], "q": randi_range(L["q"][0], L["q"][1])})
 	if out.is_empty():
 		out.append({"id": "cash", "v": randi_range(1, 4) * 100})
 	return out
@@ -4502,6 +4616,9 @@ func ctx_action() -> Dictionary:
 			var sq = near_suspect(2.2)
 			if not sq.is_empty():
 				return {"l": "ALGEMAR", "f": func(): search = {"kind": "cuff", "s": sq, "t": 0.0, "need": 1.0 if sq["state"] == "down" else 1.8, "label": "A ALGEMAR"}}
+		var dq = near_drop(2.0)
+		if not dq.is_empty():
+			return {"l": "ABRIR", "f": func(): search = {"kind": "drop", "d": dq, "t": 0.0, "need": 2.0, "label": "A ABRIR A ENCOMENDA"}}
 		var p = near_poi(4.3)
 		if not p.is_empty() and not duty.is_empty() and p["kind"] in ["heist", "rear", "alarm", "venda", "mb"]:
 			return {"l": "EM\nSERVIÇO", "off": true}
@@ -4787,6 +4904,8 @@ func update_game(dt: float) -> void:
 			search = {}
 	if not duty.is_empty():
 		update_duty(dt)
+	if Z["kind"] == "city":
+		update_drops(dt)
 	if not search.is_empty() and search["kind"] == "table":
 		var sv = search["van"]
 		if not P["in_car"] and Vector2(P["x"] - sv["tx"], P["y"] - sv["ty"]).length() < 3.0:
@@ -5932,6 +6051,8 @@ func _draw_minimap() -> void:
 				_draw_icon(minimap, sp, p["kind"] if p["kind"] in ["venda", "mb"] else p["id"], 6.0 if p["kind"] in ["venda", "mb"] else 8.0)
 		for p in police:
 			minimap.draw_circle(to_scr.call(Vector2(p["x"], p["y"])), 4.5, RED if int(t * 6) % 2 == 0 else Color("#3a6aff"))
+		for dr in drops:
+			minimap.draw_circle(to_scr.call(Vector2(dr["x"], dr["y"])), 5.5, GOLD)
 		for sq in suspects:
 			minimap.draw_circle(to_scr.call(Vector2(sq["x"], sq["y"])), 5.0, RED if int(t * 4) % 2 == 0 else Color("#ffd56a"))
 		for g in gang:
