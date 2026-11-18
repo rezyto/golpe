@@ -4919,7 +4919,7 @@ func update_daynight(dt: float) -> void:
 		else:
 			feed_add("Amanhece", GOLD)
 	var h = game_hour()
-	var e = sin((h - 6.0) / 12.0 * PI)   # >0 de dia
+	var e = sin((h - 6.5) / 14.0 * PI)   # >0 de dia (nasce 6:30, põe-se 20:30)
 	var day = clampf(e * 2.5, 0.0, 1.0)  # transição suave ao nascer/pôr do sol
 	if e > 0.0:
 		sun.rotation_degrees = Vector3(-(8.0 + 64.0 * e), -38.0 + (h - 12.0) * 9.0, 0)
