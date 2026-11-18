@@ -1,0 +1,32 @@
+name: GOLPE — descarregar recursos CC0
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/fetch_assets.py
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ferramentas
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg p7zip-full imagemagick
+      - name: Descarregar (Poly Haven, OpenGameArt)
+        run: python3 tools/fetch_assets.py jogo/assets/ext
+      - name: Reduzir texturas para telemóvel
+        run: |
+          find jogo/assets/ext -name '*.jpg' -size +400k -exec mogrify -resize '1024x1024>' -quality 85 {} \; || true
+          du -sh jogo/assets/ext; find jogo/assets/ext -type f | wc -l
+          cat jogo/assets/ext/LICENSES.md
+      - name: Guardar no repositório
+        run: |
+          git config user.name "golpe-bot"
+          git config user.email "golpe-bot@users.noreply.github.com"
+          git add jogo/assets/ext
+          git commit -m "Recursos CC0 descarregados (Poly Haven, OpenGameArt)" || echo "sem alterações"
+          git pull --rebase -q origin main && git push -q origin HEAD:main
