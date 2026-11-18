@@ -1882,7 +1882,7 @@ func place_street_machines(z: Dictionary, r: RandomNumberGenerator, rx: Array, r
 			spots.append(Vector2(x, y))
 	var n = 0
 	for v in spots:
-		if r.randf() > 0.55:
+		if r.randf() > 0.7:
 			continue
 		var kind = "mb" if n % 3 == 1 else "venda"
 		var my = v.y + rw + 1.25
@@ -6182,7 +6182,10 @@ func open_sell(v: Dictionary) -> void:
 
 func cont_dims(c: Dictionary) -> Vector2i:
 	if c.has("dims"):
-		return c["dims"]
+		var dd = c["dims"]
+		if typeof(dd) == TYPE_ARRAY:
+			return Vector2i(int(dd[0]), int(dd[1]))
+		return dd
 	if c.get("kind", "") == "cofre":
 		return Vector2i(6, 5)
 	if c.get("kind", "") in ["caixa", "maquina"]:
