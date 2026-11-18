@@ -1778,9 +1778,10 @@ func _bake_collect(node: Node, xf: Transform3D, groups: Dictionary, mats: Dictio
 		if ch is MeshInstance3D and ch.mesh != null and ch.visible:
 			var mi: MeshInstance3D = ch
 			var ok = true
-			for i in mi.mesh.get_surface_count():
-				if mi.mesh.surface_get_primitive_type(i) != Mesh.PRIMITIVE_TRIANGLES:
-					ok = false
+			if mi.mesh is ArrayMesh:
+				for i in mi.mesh.get_surface_count():
+					if mi.mesh.surface_get_primitive_type(i) != Mesh.PRIMITIVE_TRIANGLES:
+						ok = false
 			if ok and ch.get_child_count() == 0:
 				for i in mi.mesh.get_surface_count():
 					var m: Material = mi.material_override
@@ -1788,7 +1789,12 @@ func _bake_collect(node: Node, xf: Transform3D, groups: Dictionary, mats: Dictio
 						m = mi.get_surface_override_material(i)
 					if m == null:
 						m = mi.mesh.surface_get_material(i)
-					var key = "%d|%d|%d" % [m.get_instance_id() if m != null else 0, mi.mesh.surface_get_format(i), int(mi.cast_shadow)]
+					var arr = mi.mesh.surface_get_arrays(i)
+					var fm = 0
+					for ai in [Mesh.ARRAY_NORMAL, Mesh.ARRAY_TANGENT, Mesh.ARRAY_COLOR, Mesh.ARRAY_TEX_UV, Mesh.ARRAY_TEX_UV2, Mesh.ARRAY_INDEX]:
+						if arr[ai] != null:
+							fm |= 1 << ai
+					var key = "%d|%d|%d" % [m.get_instance_id() if m != null else 0, fm, int(mi.cast_shadow)]
 					if not groups.has(key):
 						var st = SurfaceTool.new()
 						st.begin(Mesh.PRIMITIVE_TRIANGLES)
