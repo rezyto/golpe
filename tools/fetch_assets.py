@@ -161,7 +161,10 @@ def fetch_sounds():
             print("falhou página", page, e)
             continue
         links = sorted(set(re.findall(r'https://opengameart\.org/sites/default/files/[^"\']+\.(?:zip|7z|ogg|wav)', html)))
-        links += sorted(set(re.findall(r'https://kenney\.nl/media/[^"\']+\.zip', html)))
+        for m in sorted(set(re.findall(r'["\'](https://kenney\.nl)?(/media/[^"\']+\.zip)["\']', html))):
+            links.append("https://kenney.nl" + m[1])
+        if not links:
+            print("  (sem zip) amostra:", re.findall(r'href="([^"]+)"', html)[:40])
         if not links:
             print("sem ficheiros em", page)
             continue
@@ -184,9 +187,10 @@ def fetch_sounds():
 
 
 SND_ROLES = {
-    "tiro_pistola": ["pistol", "handgun", "9mm", "glock", "revolver"],
-    "tiro_smg": ["smg", "uzi", "mp5", "submachine"],
-    "tiro_espingarda": ["rifle", "ak", "m4", "ar15", "assault"],
+    "tiro_pistola": ["/1911/", "/walther ppq/", "/bersa/", "/ruger mark iii/"],
+    "tiro_smg": ["/ppsh/", "/carl gustav m45/"],
+    "tiro_espingarda": ["/ak-47/", "/ar-15/", "/sks/"],
+    "tiro_caçadeira": ["/mossberg/", "/nova/", "/model 12/"],
     "recarregar": ["reload", "magazine", "mag_in", "clip"],
     "seco": ["dry", "empty", "click"],
     "passo": ["footstep", "step"],
