@@ -88,3 +88,24 @@ Pontos 1–7 do plano v0.4 implementados e verificados por capturas (ramo `captu
 Código: game/main.gd (secções: ITENS E DINHEIRO, JANELA DE ITENS, INTERIORES, CARRINHAS, MENUS), game/data.gd (ITEMS, INTERIORS, STORY, VAN_*), game/icons/*.png.
 Save com "ver": 4 (saves antigos reiniciam). Por fazer: personagens mais realistas (Quaternius Universal Base Characters + Animation Library, CC0),
 física de carros (VehicleBody3D), texturas PBR/HDRI, renderizador móvel, som, multijogador.
+
+## Estado v0.5 (feito 18/11, sessão no PC com Godot ao vivo)
+- Revisão por 3 agentes (recon ROB RUN, visual, código) em `replica/` — paridade 46% antes desta sessão.
+- Save seguro (ficheiro temporário + cópia .bak + migração; só grava quando muda).
+- Atualização robusta: sem limite de tempo total, vigia de bloqueio, tamanho + sha256, `min_app`, modo seguro (volta à versão de fábrica se um pacote não arrancar). App 2.3.0.
+- Bugs: o mundo não pára com inventário/mapa/menus; mala apreendida na prisão/hospital; trânsito não entra no mar; pagamento da história validado; materiais partilhados.
+- Novo: máquinas de venda (pé-de-cabra) e multibancos (berbequim, alarme) na rua, com disputa de rivais.
+- Novo: notas marcadas (dinheiro sujo) + Lavandaria Bolha (comissão 25%, tempo de espera).
+- Novo: turno de polícia na Esquadra da PSV (6 min, roubos em curso, derrubar/algemar, salário + bónus, 15 min entre turnos).
+- Novo: encomendas perdidas aleatórias com itens raros, disputadas por rivais.
+- Novo: ciclo dia/noite (16 min), relógio no HUD, menos testemunhas à noite.
+- Desempenho: sombras 2 divisões/42 m, grelha espacial nas colisões, prédios e carros estacionados fundidos por material.
+- Editor: quando corre no Godot, salta a atualização e usa o código local.
+
+### A seguir
+1. Áudio (motor, sirenes, tiros, ambiente) — maior lacuna de paridade.
+2. Personagens com roupa / interiores mais ricos / tema de UI único (revisão visual).
+3. Coletes, munições, médicos; filtros no mapa; bairro de elite.
+4. Melhorias de carro (motor, blindagem), carrinha de carga.
+5. Assaltos grandes encadeados + alertas na cidade; subornos e prisão.
+6. Base modular com ataques de IA. Depois multijogador (camada de comandos, IDs, tick fixo).
