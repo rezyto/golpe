@@ -581,25 +581,76 @@ func default_save() -> Dictionary:
 		"stats": {"heists": 0, "busted": 0, "earned": 0, "hospital": 0}}
 
 
+func _read_save(path: String) -> Variant:
+	if not FileAccess.file_exists(path):
+		return null
+	var j = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(j) == TYPE_DICTIONARY and int(j.get("ver", 0)) >= 1:
+		return j
+	return null
+
+
+func migrate_save(j: Dictionary) -> Dictionary:
+	# Versões antigas: aproveita tudo o que tiver o mesmo nome; o resto vem do default.
+	var v = int(j.get("ver", 0))
+	if v < 4:
+		if j.has("inv") and typeof(j["inv"]) != TYPE_ARRAY:
+			j.erase("inv")
+	j["ver"] = 4
+	return j
+
+
 func load_game() -> void:
 	S = default_save()
-	if FileAccess.file_exists(SAVE_PATH):
-		var j = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-		if typeof(j) == TYPE_DICTIONARY and int(j.get("ver", 0)) == 4:
-			for k in j.keys():
-				S[k] = j[k]
+	var j: Variant = _read_save(SAVE_PATH)
+	if j == null:
+		j = _read_save(SAVE_PATH + ".bak")
+		if j != null:
+			toast("Gravação recuperada da cópia de segurança", GOLD)
+	if j == null:
+		j = _read_save(SAVE_PATH + ".tmp")
+	if j != null:
+		j = migrate_save(j)
+		for k in j.keys():
+			S[k] = j[k]
 	S["lvl"] = int(S["lvl"])
 	S["money"] = int(S["money"])
 	S["story"] = int(S["story"])
 	S["ties"] = int(S["ties"])
+	save_hash = 0
 
 
-func save_game() -> void:
+var save_hash: int = 0
+
+
+func save_game(force: bool = false) -> void:
+	var c = S.duplicate()
+	c.erase("last")
+	var h = JSON.stringify(c).hash()
+	if not force and h == save_hash:
+		return
 	S["last"] = now_ms()
-	var f = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f:
-		f.store_string(JSON.stringify(S))
-		f.close()
+	var body = JSON.stringify(S)
+	var tmp = SAVE_PATH + ".tmp"
+	var f = FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(body)
+	f.flush()
+	f.close()
+	# Confirma que o ficheiro novo é legível antes de substituir o antigo.
+	if typeof(JSON.parse_string(FileAccess.get_file_as_string(tmp))) != TYPE_DICTIONARY:
+		return
+	var d = DirAccess.open("user://")
+	if d == null:
+		return
+	var base = SAVE_PATH.get_file()
+	if d.file_exists(base):
+		if d.file_exists(base + ".bak"):
+			d.remove(base + ".bak")
+		d.rename(base, base + ".bak")
+	d.rename(base + ".tmp", base)
+	save_hash = h
 
 
 func offline_income() -> void:
@@ -614,7 +665,7 @@ func offline_income() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if not S.is_empty():
-			save_game()
+			save_game(true)
 
 
 # =====================================================================
@@ -813,6 +864,16 @@ func setup_3d() -> void:
 	player_mesh = make_char("Rogue", true, "#2aa39a")
 	player_mesh.visible = false
 	add_child(player_mesh)
+
+
+func mat_2s(col: String, rough = 0.85, metal = 0.0) -> StandardMaterial3D:
+	## material de dupla face com cache própria (não mexe no material partilhado)
+	var k = "2s|%s|%s|%s" % [col, rough, metal]
+	if not mat_cache.has(k):
+		var m = mat(col, rough, metal).duplicate()
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mat_cache[k] = m
+	return mat_cache[k]
 
 
 func mat(col: String, rough = 0.85, metal = 0.0) -> StandardMaterial3D:
@@ -2408,7 +2469,8 @@ func update_life(dt: float) -> void:
 		c["cur"] = c["cur"] + (tgt - c["cur"]) * minf(1.0, dt * (5.0 if blocked else 1.2))
 		c["x"] = c["x"] + fx * c["cur"] * dt
 		c["y"] = c["y"] + fy * c["cur"] * dt
-		if c["x"] < -5 or c["x"] > Z["w"] + 5 or c["y"] < -5 or c["y"] > Z["h"] + 5:
+		# fim da estrada (não entrar no mar nem atravessar prédios)
+		if c["x"] < float(Z["rx"].min()) - 3.0 or c["x"] > float(Z["rx"].max()) + 3.0 or c["y"] < float(Z["ry"].min()) - 3.0 or c["y"] > float(Z["ry"].max()) + 3.0 or c["x"] < -5 or c["x"] > Z["w"] + 5 or c["y"] < -5 or c["y"] > Z["h"] + 5:
 			c["mesh"].queue_free()
 			continue
 		if P["in_car"] and dist(c, car) < 3.4:
@@ -2629,12 +2691,8 @@ func make_proc_car(kind: String, col: String, police = false) -> Node3D:
 	var body = MeshInstance3D.new()
 	body.mesh = car_body_mesh(kind)
 	body.set_surface_override_material(0, paint_mat(col))
-	var gm = mat("#3a4c5e", 0.04, 0.85)
-	gm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	body.set_surface_override_material(1, gm)
-	var dm = mat("#151618", 0.8)
-	dm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	body.set_surface_override_material(2, dm)
+	body.set_surface_override_material(1, mat_2s("#3a4c5e", 0.04, 0.85))
+	body.set_surface_override_material(2, mat_2s("#151618", 0.8))
 	g.add_child(body)
 	var front_t = pinterp(sp["body"], 1.0)
 	var rear_t = pinterp(sp["body"], 0.0)
@@ -3945,8 +4003,13 @@ func _drag(id: int, pos: Vector2) -> void:
 		cam_drag["last"] = pos
 
 
+var sim_lock = false
+
+
 func input_vec() -> Vector2:
 	var v = Vector2.ZERO
+	if sim_lock:
+		return v
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
 		v.x -= 1
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
@@ -4071,7 +4134,27 @@ func exit_car() -> void:
 	push_out(P, 0.45)
 
 
+func close_overlays() -> void:
+	if loot_ui.visible:
+		close_loot()
+	if modal.visible:
+		close_menu()
+	if fullmap_ui.visible:
+		close_fullmap()
+	if not mg.is_empty():
+		close_minigame()
+
+
+func lose_trunk(why: String) -> void:
+	var tr = S["trunks"].get(S["car"], [])
+	if cur_place != "home" and tr.size() > 0:
+		S["trunks"][S["car"]] = []
+		feed_add("Mala do carro %s" % why, RED)
+
+
 func busted() -> void:
+	close_overlays()
+	lose_trunk("apreendida")
 	var fine = int(S["money"] * 0.1)
 	S["money"] = int(S["money"]) - fine
 	S["inv"] = []
@@ -4082,6 +4165,8 @@ func busted() -> void:
 
 
 func hospital() -> void:
+	close_overlays()
+	lose_trunk("perdida")
 	var fine = int(S["money"] * 0.15)
 	S["money"] = int(S["money"]) - fine
 	S["inv"] = []
@@ -4213,6 +4298,17 @@ func _process(delta: float) -> void:
 			update_interior(dt)
 		else:
 			update_game(dt)
+	elif mode in ["loot", "menu", "fullmap", "mini"] and not Z.is_empty():
+		# O mundo não pára: polícia, alarmes e contagens continuam com o inventário aberto.
+		sim_lock = true
+		var was_firing = firing
+		firing = false
+		if inside:
+			update_interior(dt)
+		else:
+			update_game(dt)
+		firing = was_firing
+		sim_lock = false
 	if mode != "login" and not Z.is_empty():
 		render(dt)
 		update_hud()
@@ -6252,8 +6348,11 @@ func menu_bar(box: VBoxContainer) -> void:
 			var left = int(st["pay"]) - int(S["paid"])
 			var can = mini(total_money(), left)
 			row(box, "Pago: %s de %s" % [fmt(S["paid"]), fmt(st["pay"])], "Faltam " + fmt(left), "Pagar " + fmt(can), func():
-				spend(can)
-				S["paid"] = int(S["paid"]) + can
+				var amt = mini(total_money(), int(st["pay"]) - int(S["paid"]))
+				if amt <= 0 or not spend(amt):
+					toast("Não tens dinheiro suficiente", RED)
+					return
+				S["paid"] = int(S["paid"]) + amt
 				if int(S["paid"]) >= int(st["pay"]):
 					story_advance(), "g", can <= 0, "cash")
 	else:

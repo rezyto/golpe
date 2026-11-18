@@ -21,6 +21,12 @@ func _ready() -> void:
 	app_version = _read("res://boot/app_version.txt", "0.0.0")
 	builtin_version = _read("res://game/content_version.txt", "0.0.0")
 	_build_ui()
+	if OS.has_feature("editor"):
+		# No editor corre sempre o código local (sem descarregar nem carregar PCK).
+		Engine.set_meta("content_version", builtin_version + "-dev")
+		Engine.set_meta("app_version", app_version)
+		get_tree().change_scene_to_file.call_deferred("res://game/main.tscn")
+		return
 	http = HTTPRequest.new()
 	http.timeout = 10.0
 	http.use_threads = true

@@ -1,0 +1,94 @@
+feature,area,priority,original,clone,notes
+Lojas pequenas assaltáveis (café/farmácia/bombas/garrafeira),Assaltos,must,yes,yes,GOLPE tem 8 interiores
+Ameaçar funcionário para impedir alarme,Assaltos,must,yes,yes,amarrar também existe
+Contentores com tempo de procura e saque revelado,Assaltos,must,yes,yes,
+Máscara que muda o estado civil para criminoso,Assaltos,must,yes,partial,GOLPE: máscara só esconde das câmaras; não há estado civil/criminoso
+Câmaras de segurança destrutíveis,Assaltos,should,yes,yes,
+Caixa elétrica exterior que corta alarme/comunicações,Assaltos,should,yes,yes,minijogo de tempo
+Cofres que exigem berbequim ruidoso e demorado,Assaltos,must,yes,yes,
+Caixas registadoras como fonte rápida de dinheiro,Assaltos,should,yes,partial,confirmar se há caixa registadora própria nos interiores
+Assalto a casas/moradias residenciais,Assaltos,should,yes,no,bairro de elite com moradias
+Cofres de depósito no banco que enchem uma chave de nível superior,Assaltos,should,yes,no,cadeia de itens que leva ao cofre-forte
+Golpes grandes que alertam toda a cidade (cofre de ouro/arsenal/carro em exposição/peça de galeria),Assaltos,should,yes,partial,banco e museu existem; falta aviso global e alvos únicos
+Contentores do lixo pesquisáveis,Assaltos,could,yes,no,saque de entrada para principiantes
+Bagageiras de carros estacionados arrombáveis (incl. polícia),Assaltos,should,yes,yes,
+Máquinas de venda/pequenos objetos de rua assaltáveis,Assaltos,could,não confirmado,no,não encontrado em fontes públicas; ideia própria para GOLPE
+Gazua para portas trancadas,Ferramentas,must,yes,yes,
+Ferramentas especiais por alvo (cortador de vidro/cartão/bloqueador),Ferramentas,should,yes,partial,GOLPE tem pé-de-cabra/gazuas/berbequim
+Descodificadores para invadir bases,Ferramentas,should,yes,no,consumível de 12 s
+Granadas de fumo e atordoamento,Ferramentas,could,yes,no,
+Troca direta (barter) de itens por ferramentas raras,Ferramentas,should,yes,no,comerciante escondido
+Itens que carregam com crimes (câmara de ação/USB),Ferramentas,could,yes,no,meta-objetivo dentro do assalto
+Variedade de armas (pistola/SMG/espingarda/caçadeira),Combate,must,yes,partial,GOLPE tem 5 armas
+Munição e silenciador,Combate,should,yes,no,silenciador evita alertas
+Armadura com placas trocáveis,Combate,should,yes,no,5 níveis
+Consumíveis médicos (ligaduras/analgésicos/kit),Combate,should,yes,no,
+Rendição vs morte com regras de perda diferentes,Combate,must,yes,partial,GOLPE só tem penalização ao ser preso
+Hospital/respawn com tempo crescente,Combate,could,yes,partial,
+Personalização de personagem e roupas,Personagem,should,yes,no,cosmético persistente
+Inventário em grelha com tamanhos de item,Inventário,must,yes,yes,
+Mochilas de vários tamanhos,Inventário,must,yes,yes,
+Raridade de itens por cores (incomum/épico/lendário/exótico),Inventário,must,yes,yes,
+Saque aleatório por tabelas de contentor,Inventário,should,yes,yes,
+Perde a mochila mas mantém equipamento vestido,Inventário,must,yes,partial,GOLPE perde dinheiro físico; separar slots equipados
+Slots rápidos (curar/placas),Inventário,could,yes,no,
+Vários carros com estatísticas distintas,Veículos,must,yes,yes,7 carros
+Bagageira em grelha,Veículos,must,yes,yes,
+Carro de aluguer grátis em terminais,Veículos,should,yes,no,evita ficar a pé
+Carrinha com espaços de carga e melhorias,Veículos,should,yes,no,
+Melhorias de veículo (turbo/direção/bagageira),Veículos,should,yes,no,
+Helicóptero com heliporto,Veículos,could,yes,no,
+Encomendas/carga transportável para vender ou desmontar,Veículos,should,yes,no,
+Nível de procurado/notoriedade visível,Polícia,must,yes,yes,estrelas 0-5
+Polícia que persegue e prende,Polícia,must,yes,yes,IA
+Modo polícia jogável (turno/viatura/salário/prisões),Polícia,should,yes,no,em GOLPE pode ser modo offline contra criminosos IA
+Distintivos/patentes que dão equipamento melhor,Polícia,could,yes,no,
+Subornos pagos com dinheiro limpo,Polícia,should,yes,no,
+Prisão com estatística persistente,Polícia,should,yes,no,
+Bloqueios e armadilhas em pontes,Polícia,could,yes,no,
+Chamadas de reforço com bónus,Polícia,could,yes,no,
+Receptadores móveis no mapa,Economia,must,yes,yes,3 carrinhas
+Dinheiro no balcão a recolher (risco de roubo),Economia,should,yes,yes,
+Bónus de preço por notoriedade,Economia,should,yes,no,10-50%
+Centros de venda só para residentes do distrito,Economia,could,yes,no,
+Dinheiro sujo vs limpo e branqueamento,Economia,must,yes,no,núcleo da gestão de risco
+Conta bancária e multibancos,Economia,should,yes,partial,GOLPE tem cofre no esconderijo
+Mercado negro com desbloqueios progressivos,Economia,should,yes,partial,loja de armas existe
+Árvore de pesquisa/documentos (portátil),Progressão,should,yes,no,
+Produção na base (estufa/laboratório),Bases,should,yes,partial,GOLPE tem rendimento passivo de imóveis
+Esconderijo com cofre,Bases,must,yes,yes,
+Construção modular da base,Bases,should,yes,no,
+Defesa da base (painéis/fusíveis/alarmes),Bases,should,yes,no,
+Rusgas a bases rivais,Bases,should,yes,no,em GOLPE contra gangues IA
+Terrenos para alugar e povoações para possuir,Bases,should,yes,partial,imobiliário compra/arrenda
+Bancada para desmontar carga e fabricar,Bases,could,yes,no,
+Garagem para guardar carros,Bases,should,yes,partial,
+Clãs/famílias com cargos,Clãs,should,yes,no,em SP: equipa de IA recrutável
+Controlo de distritos/territórios,Clãs,should,yes,partial,GOLPE tem 3 territórios com bandeira; sem rendimento
+Impostos de território a recolher,Clãs,could,yes,no,
+Guerras e tréguas entre gangues,Clãs,could,yes,no,
+Missões introdutórias/história,Progressão,must,yes,yes,3 capítulos no bar
+XP e níveis,Progressão,should,yes,yes,
+Níveis de notoriedade com benefícios,Progressão,should,yes,partial,
+Níveis de distrito que desbloqueiam itens,Progressão,could,yes,no,
+Conquistas,Progressão,could,yes,no,
+Reinício periódico com meta-progressão,Temporadas,should,yes,no,em SP: temporadas opcionais/prestígio
+Passe de temporada cosmético (grátis+premium),Temporadas,should,yes,no,
+Moeda premium só cosmética,Temporadas,could,yes,no,
+Conta/login,Multijogador,must,yes,yes,
+Servidores partilhados com milhares,Multijogador,could,yes,no,fora do âmbito de GOLPE SP
+Grupos até 3 jogadores,Multijogador,could,yes,no,
+Anti-batota,Multijogador,could,yes,no,
+Avisos globais de evento na cidade,Eventos,should,yes,no,
+Contratos/trabalhos,Eventos,should,yes,yes,
+Minijogo de casino/roleta,Eventos,could,yes,no,moeda virtual
+Locais de lazer (discoteca/clube),Eventos,could,yes,no,
+Cidade costeira com distritos de carácter distinto,Mapa,must,yes,partial,GOLPE tem canal e 4 distritos; sem frente de mar
+Pontes como pontos de estrangulamento,Mapa,should,yes,yes,
+Mapa com filtros de marcadores (serviços/contentores),Mapa,must,yes,partial,mapa+waypoint sem filtros
+Zonas fora da cidade (base inicial/povoações/prisão),Mapa,should,yes,partial,mapa regional
+Multibancos espalhados pela cidade,Mapa,should,yes,no,
+Fugir pela água / afogamento,Mapa,could,yes,no,
+Tráfego e peões reativos,Mapa,should,yes,yes,
+Ciclo dia/noite,Mapa,should,yes,no,
+Áudio (tiros/sirenes/alarmes),UX,must,yes,no,crítico para tensão
