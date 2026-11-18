@@ -104,6 +104,7 @@ const SHOPS := {
 	"stand": {"name": "Stand Rodas Livres", "col": "#a8742c", "lvl": 1},
 	"imob": {"name": "Imobiliária Chave d'Ouro", "col": "#7c6a3a", "lvl": 1},
 	"lavandaria": {"name": "Lavandaria Bolha", "col": "#3d6f8e", "lvl": 1},
+	"esquadra": {"name": "Esquadra da PSV", "col": "#2c4a7a", "lvl": 1},
 }
 
 const BPAL := ["#6b6f7a", "#7a6a5a", "#5d6b78", "#8a7f6a", "#6a5a6e", "#5f7466", "#857066", "#6e7580", "#9a8b74", "#71808a"]
@@ -119,7 +120,7 @@ const REGION := [
 const CITY_CELLS := {
 	"2,1": "cafe", "1,2": "hotel", "2,2": "museu", "4,1": "bomba", "1,3": "armeiro",
 	"5,1": "stand", "4,2": "imob", "2,3": "t_velho", "5,3": "t_docas", "5,2": "t_ind",
-	"1,1": "joalharia", "4,3": "farmacia", "6,1": "garrafeira", "6,2": "banco", "6,3": "lavandaria",
+	"1,1": "joalharia", "4,3": "farmacia", "6,1": "garrafeira", "6,2": "banco", "6,3": "lavandaria", "5,0": "esquadra",
 }
 
 const DISTRICTS := [
@@ -130,7 +131,7 @@ const DISTRICTS := [
 const ICONS := {
 	"cafe": ["C", "#e0483e"], "bomba": ["B", "#e0483e"], "hotel": ["H", "#e0483e"], "museu": ["M", "#e0483e"],
 	"farmacia": ["F", "#e0483e"], "garrafeira": ["G", "#e0483e"], "joalharia": ["J", "#e0483e"], "banco": ["$", "#e0483e"],
-	"armeiro": ["A", "#e8b931"], "stand": ["S", "#e8b931"], "imob": ["I", "#e8b931"], "lavandaria": ["L", "#e8b931"],
+	"armeiro": ["A", "#e8b931"], "stand": ["S", "#e8b931"], "imob": ["I", "#e8b931"], "lavandaria": ["L", "#e8b931"], "esquadra": ["P", "#4f8ff0"],
 	"venda": ["v", "#d0d4da"], "mb": ["€", "#5aa0e0"],
 	"t_docas": ["T", "#9a6ad0"], "t_velho": ["T", "#9a6ad0"], "t_ind": ["T", "#9a6ad0"],
 	"van": ["V", "#3cc48a"],
@@ -143,6 +144,12 @@ const STREET := {
 	"mb": {"n": "Multibanco", "tool": "berbequim", "need": 9.0, "cd": 20, "dims": [4, 3],
 		"loot": [{"sujo": [4000, 12000]}, {"sujo": [2000, 6000]}]},
 }
+## turno de polícia: tempo limitado, salário no fim, bónus por detenção
+const DUTY_SECS := 360.0
+const DUTY_SALARY := 6000
+const DUTY_BONUS := 3500
+const DUTY_COOLDOWN_MIN := 15
+const DUTY_MAX_SUSPECTS := 3
 const WASH_FEE := 0.25
 const WASH_MAX := 60000
 const WASH_MIN_PER_10K := 1.0   # minutos de espera por cada 10 000 lavados

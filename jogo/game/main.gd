@@ -120,6 +120,9 @@ var mg_sub: Label
 var mg_bar: Control
 var mg_btn: Button
 var lbl_speed: Label
+var lbl_duty: Label
+var duty = {}        # turno de polícia em curso
+var suspects = []    # suspeitos a fugir durante o turno
 var panic_t = 0.0
 var stand_pivot: Node3D
 var stand_sel = ""
@@ -568,6 +571,34 @@ func autotest() -> void:
 	await tr.process_frame
 	close_menu()
 	print("autotest: sujo ", dz, " em lavagem ", S["wash"].size())
+	# turno de polícia
+	S["cds"].erase("duty")
+	open_shop("esquadra")
+	await tr.process_frame
+	close_menu()
+	start_duty()
+	spawn_suspect()
+	var sq0 = suspects[0] if suspects.size() > 0 else {}
+	if not sq0.is_empty():
+		P["x"] = sq0["x"] + 1.0
+		P["y"] = sq0["y"]
+		P["in_car"] = false
+		await tr.process_frame
+		await tr.process_frame
+		var st0 = sq0["state"]
+		P["x"] = sq0["x"] + 0.8
+		P["y"] = sq0["y"]
+		await tr.process_frame
+		var lab2 = ctx_action().get("l", "")
+		do_action()
+		if not search.is_empty():
+			search["t"] = 999.0
+		await tr.process_frame
+		await tr.process_frame
+		print("autotest: turno suspeito ", st0, " botao ", lab2, " detidos ", duty.get("arrests", -1))
+	var m0 = int(S["money"])
+	end_duty(false)
+	print("autotest: fim do turno +", int(S["money"]) - m0, " carro ok ", is_instance_valid(car["mesh"]))
 	open_shop("stand")
 	await tr.process_frame
 	stand_sel = "furia"
@@ -2442,6 +2473,8 @@ func make_ring(pos: Vector3, r_in: float, r_out: float, col: Color) -> MeshInsta
 #  ENTRAR / SAIR DE LUGARES
 # =====================================================================
 func free_entities() -> void:
+	if not duty.is_empty():
+		end_duty(false)
 	for p in police:
 		p["mesh"].queue_free()
 	for g in gang:
@@ -3156,6 +3189,152 @@ func outdoor_action(p: Dictionary) -> Dictionary:
 			return {"l": "ARROMBAR", "f": func(): search = {"kind": "rear", "ref": ref, "t": 0.0, "need": 3.5, "label": "A ARROMBAR A PORTA DAS TRASEIRAS"}}
 		return {"l": "PRECISAS\nFERRAMENTA", "off": true}
 	return {}
+
+
+func menu_duty(box: VBoxContainer) -> void:
+	note(box, "Turno de %d minutos ao volante de um carro-patrulha. Há roubos a acontecer pela cidade: apanha os suspeitos (derruba-os com o carro ou corre atrás deles) e algema-os. Salário no fim do turno + %s por cada detido." % [int(D.DUTY_SECS / 60.0), fmt(D.DUTY_BONUS)], true)
+	var left = float(S["cds"].get("duty", 0)) - now_ms()
+	if not duty.is_empty():
+		row(box, "Turno em curso", "Faltam " + mmss(float(duty["left"]) * 1000.0), "Terminar já", func():
+			end_duty(false), "o", false, "")
+		return
+	var why = ""
+	if wanted > 0:
+		why = "Estás a ser procurado"
+	elif left > 0:
+		why = "Próximo turno em " + mmss(left)
+	row(box, "Começar turno", why if why != "" else "Salário " + fmt(D.DUTY_SALARY), "Entrar ao serviço", func():
+		close_menu()
+		start_duty(), "g", why != "", "")
+
+
+func start_duty() -> void:
+	duty = {"left": D.DUTY_SECS, "arrests": 0, "spawn": 2.0, "old_car": car["mesh"]}
+	# troca o carro pelo carro-patrulha (o teu fica guardado)
+	var pm = make_car("#eef0f2", true)
+	add_child(pm)
+	car["mesh"].visible = false
+	car["mesh"] = pm
+	wanted = 0
+	toast("Em serviço! Procura roubos em curso no mapa", Color("#9cc4ff"))
+	feed_add("Turno de polícia começou", Color("#9cc4ff"))
+
+
+func end_duty(silent: bool) -> void:
+	var pay = 0
+	if not silent:
+		var frac = clampf(1.0 - float(duty["left"]) / D.DUTY_SECS, 0.0, 1.0)
+		pay = int(round(D.DUTY_SALARY * frac / 100.0)) * 100 + int(duty["arrests"]) * D.DUTY_BONUS
+		add_money(pay)
+		add_xp(15 * int(duty["arrests"]) + 10)
+		toast("Fim do turno: %d detidos, +%s no cofre" % [int(duty["arrests"]), fmt(pay)], GOLD)
+		feed_add("Turno terminado: +" + fmt(pay), GOLD)
+	S["cds"]["duty"] = now_ms() + D.DUTY_COOLDOWN_MIN * 60000.0
+	for sq in suspects:
+		if is_instance_valid(sq["mesh"]):
+			sq["mesh"].queue_free()
+	suspects = []
+	if duty.has("old_car") and is_instance_valid(duty["old_car"]) and car.has("mesh") and is_instance_valid(car["mesh"]):
+		car["mesh"].queue_free()
+		car["mesh"] = duty["old_car"]
+		car["mesh"].visible = true
+	duty = {}
+
+
+func near_suspect(r: float) -> Dictionary:
+	for sq in suspects:
+		if dist(P, sq) < r:
+			return sq
+	return {}
+
+
+func spawn_suspect() -> void:
+	# um roubo começa num ponto da cidade longe do jogador
+	var cands = []
+	for p in Z["pois"]:
+		if p["kind"] in ["venda", "mb", "heist"] and dist(P, p) > 45.0 and dist(P, p) < 160.0:
+			cands.append(p)
+	if cands.is_empty():
+		return
+	var p = cands[randi() % cands.size()]
+	var m = make_char("Rogue_Hooded", true, "#c0392b")
+	add_child(m)
+	suspects.append({"x": float(p["x"]), "y": float(p["y"]) + 1.0, "ang": 0.0, "mesh": m, "phase": 0.0, "state": "rob", "t": randf_range(10.0, 18.0), "where": p["name"], "spd": randf_range(4.2, 4.9)})
+	feed_add("Roubo em curso: " + p["name"], RED)
+	toast("Central: roubo em curso — " + p["name"], RED)
+
+
+func update_duty(dt: float) -> void:
+	wanted = 0
+	duty["left"] = float(duty["left"]) - dt
+	if float(duty["left"]) <= 0.0:
+		end_duty(false)
+		return
+	duty["spawn"] = float(duty["spawn"]) - dt
+	if duty["spawn"] <= 0.0 and suspects.size() < D.DUTY_MAX_SUSPECTS:
+		spawn_suspect()
+		duty["spawn"] = randf_range(14.0, 24.0)
+	var keep = []
+	for sq in suspects:
+		var d = dist(P, sq)
+		var moving = false
+		if sq["state"] == "rob":
+			# a roubar: só foge quando te vê perto (ou ao fim do tempo, e escapa)
+			sq["t"] = float(sq["t"]) - dt
+			if d < 22.0:
+				sq["state"] = "run"
+				feed_add("Suspeito em fuga!", RED)
+			elif float(sq["t"]) <= 0.0:
+				feed_add("O suspeito escapou: " + str(sq["where"]), RED)
+				sq["mesh"].queue_free()
+				continue
+		elif sq["state"] == "run":
+			var ax: float = sq["x"] - P["x"]
+			var ay: float = sq["y"] - P["y"]
+			var a = atan2(ay, ax) + sin(t * 1.3 + float(sq["spd"])) * 0.6
+			sq["ang"] = a
+			var sp = float(sq["spd"]) * (1.0 if d < 50.0 else 0.6)
+			sq["x"] = sq["x"] + cos(a) * sp * dt
+			sq["y"] = sq["y"] + sin(a) * sp * dt
+			push_out(sq, 0.4)
+			sq["x"] = clampf(sq["x"], 2.0, Z["w"] - 2.0)
+			sq["y"] = clampf(sq["y"], 2.0, 250.0)
+			moving = true
+			if d > 90.0:
+				feed_add("Perdeste o suspeito", RED)
+				sq["mesh"].queue_free()
+				continue
+			if P["in_car"] and dist(car, sq) < 2.3 and absf(float(car.get("spd", 0.0))) > 3.0:
+				sq["state"] = "down"
+				sq["t"] = 5.0
+				set_car_speed_scale(0.5)
+				play_anim(sq["mesh"], "Death01")
+				feed_add("Suspeito derrubado — sai e algema-o", OK_C)
+		elif sq["state"] == "down":
+			sq["t"] = float(sq["t"]) - dt
+			if float(sq["t"]) <= 0.0:
+				sq["state"] = "run"
+		var gm: Node3D = sq["mesh"]
+		sq["phase"] = float(sq["phase"]) + (dt * 8.0 if moving else 0.0)
+		gm.position = Vector3(sq["x"], 0.25, sq["y"])
+		gm.rotation.y = -float(sq["ang"])
+		if sq["state"] != "down":
+			animate_char(gm, sq["phase"], 5.0 if moving else 0.0, false, sq["state"] == "rob")
+		keep.append(sq)
+	suspects = keep
+	if not search.is_empty() and search["kind"] == "cuff":
+		var cs = search["s"]
+		if not P["in_car"] and suspects.has(cs) and dist(P, cs) < 2.6:
+			search["t"] = search["t"] + dt
+			if search["t"] >= search["need"]:
+				search = {}
+				suspects.erase(cs)
+				cs["mesh"].queue_free()
+				duty["arrests"] = int(duty["arrests"]) + 1
+				toast("Detido! +" + fmt(D.DUTY_BONUS) + " no fim do turno", OK_C)
+				feed_add("Suspeito detido", OK_C)
+		else:
+			search = {}
 
 
 func street_action(p: Dictionary) -> Dictionary:
@@ -4319,7 +4498,13 @@ func ctx_action() -> Dictionary:
 				return {"l": "RECOLHER", "f": func(): start_table(v)}
 			if Vector2(P["x"] - v["nx"], P["y"] - v["ny"]).length() < 3.6:
 				return {"l": "VENDER", "f": func(): open_sell(v)}
+		if not duty.is_empty():
+			var sq = near_suspect(2.2)
+			if not sq.is_empty():
+				return {"l": "ALGEMAR", "f": func(): search = {"kind": "cuff", "s": sq, "t": 0.0, "need": 1.0 if sq["state"] == "down" else 1.8, "label": "A ALGEMAR"}}
 		var p = near_poi(4.3)
+		if not p.is_empty() and not duty.is_empty() and p["kind"] in ["heist", "rear", "alarm", "venda", "mb"]:
+			return {"l": "EM\nSERVIÇO", "off": true}
 		if not p.is_empty():
 			if p["kind"] in ["rear", "alarm"]:
 				return outdoor_action(p)
@@ -4600,6 +4785,8 @@ func update_game(dt: float) -> void:
 				finish_street(sp)
 		else:
 			search = {}
+	if not duty.is_empty():
+		update_duty(dt)
 	if not search.is_empty() and search["kind"] == "table":
 		var sv = search["van"]
 		if not P["in_car"] and Vector2(P["x"] - sv["tx"], P["y"] - sv["ty"]).length() < 3.0:
@@ -5205,6 +5392,14 @@ func setup_ui() -> void:
 	lbl_speed.add_theme_constant_override("shadow_offset_y", 2)
 	place(lbl_speed, 0, 1, 28, -96, 260, 70)
 	hud.add_child(lbl_speed)
+	lbl_duty = lbl("", 22, Color("#9cc4ff"))
+	lbl_duty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl_duty.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	lbl_duty.add_theme_constant_override("shadow_offset_x", 2)
+	lbl_duty.add_theme_constant_override("shadow_offset_y", 2)
+	place(lbl_duty, 0.5, 0, -220, 96, 440, 34)
+	lbl_duty.visible = false
+	hud.add_child(lbl_duty)
 	prog_box = PanelContainer.new()
 	prog_box.add_theme_stylebox_override("panel", flat(Color(0.08, 0.09, 0.11, 0.85)))
 	prog_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -5549,6 +5744,9 @@ func update_hud() -> void:
 	bar_xp.value = 100.0 * float(S["xp"]) / xp_need(int(S["lvl"]))
 	bar_hp.value = float(S["hp"])
 	bar_car.value = 100.0 * float(S["car_hp"]) / float(car_def()["hp"])
+	lbl_duty.visible = not duty.is_empty()
+	if lbl_duty.visible:
+		lbl_duty.text = "EM SERVIÇO  %s  ·  detidos %d  ·  em fuga %d" % [mmss(float(duty["left"]) * 1000.0), int(duty["arrests"]), suspects.size()]
 	lbl_speed.visible = P["in_car"] and not inside and mode == "play"
 	if lbl_speed.visible:
 		lbl_speed.text = "%d km/h" % int(absf(float(car.get("spd", 0.0))) * 3.6)
@@ -5734,6 +5932,8 @@ func _draw_minimap() -> void:
 				_draw_icon(minimap, sp, p["kind"] if p["kind"] in ["venda", "mb"] else p["id"], 6.0 if p["kind"] in ["venda", "mb"] else 8.0)
 		for p in police:
 			minimap.draw_circle(to_scr.call(Vector2(p["x"], p["y"])), 4.5, RED if int(t * 6) % 2 == 0 else Color("#3a6aff"))
+		for sq in suspects:
+			minimap.draw_circle(to_scr.call(Vector2(sq["x"], sq["y"])), 5.0, RED if int(t * 4) % 2 == 0 else Color("#ffd56a"))
 		for g in gang:
 			minimap.draw_circle(to_scr.call(Vector2(g["x"], g["y"])), 3.0, PURPLE)
 		if not waypoint.is_empty():
@@ -6567,6 +6767,8 @@ func open_shop(id: String) -> void:
 		open_menu("Esconderijo", menu_home)
 	elif id == "lavandaria":
 		open_menu("Lavandaria Bolha", menu_wash)
+	elif id == "esquadra":
+		open_menu("Esquadra da PSV", menu_duty)
 
 
 func dirty_cash() -> int:
