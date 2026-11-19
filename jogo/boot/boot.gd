@@ -40,7 +40,7 @@ func _ready() -> void:
 	http.use_threads = true
 	add_child(http)
 	http.request_completed.connect(_on_version)
-	var err := http.request(BASE + "version.json?t=%d" % int(Time.get_unix_time_from_system()))
+	var err := http.request(BASE + "version3.json?t=%d" % int(Time.get_unix_time_from_system()))
 	if err != OK:
 		_start_game("")
 
@@ -147,7 +147,7 @@ func _on_version(result: int, code: int, _headers: PackedStringArray, body: Pack
 		downloading = true
 		last_bytes = 0
 		stall_t = 0.0
-		var err := http.request(BASE + "game.pck")
+		var err := http.request(BASE + "game3.pck")
 		if err != OK:
 			downloading = false
 			_start_game("")

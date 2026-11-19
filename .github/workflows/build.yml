@@ -8,7 +8,7 @@ permissions:
   contents: write
 concurrency: { group: build, cancel-in-progress: true }
 env:
-  GODOT_VER: "4.3"
+  GODOT_VER: "4.7"
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,6 +26,8 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VER}.stable
           unzip -q Godot_v${GODOT_VER}-stable_export_templates.tpz
           mv templates/* ~/.local/share/godot/export_templates/${GODOT_VER}.stable/
+      - name: Vulkan por software (para as capturas com o renderer Mobile)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mesa-vulkan-drivers > /dev/null
       - name: Configurar Android (SDK, Java, chave)
         run: |
           mkdir -p ~/.config/godot
@@ -35,9 +37,9 @@ jobs:
             "export/android/java_sdk_path = \"$JAVA_HOME\"" \
             "export/android/debug_keystore = \"$GITHUB_WORKSPACE/keys/golpe-test.keystore\"" \
             'export/android/debug_keystore_user = "androiddebugkey"' \
-            'export/android/debug_keystore_pass = "android"' > ~/.config/godot/editor_settings-4.3.tres
-          cp ~/.config/godot/editor_settings-4.3.tres ~/.config/godot/editor_settings-4.tres
-          cat ~/.config/godot/editor_settings-4.3.tres
+            'export/android/debug_keystore_pass = "android"' > ~/.config/godot/editor_settings-4.7.tres
+          cp ~/.config/godot/editor_settings-4.7.tres ~/.config/godot/editor_settings-4.tres
+          cat ~/.config/godot/editor_settings-4.7.tres
       - name: Versões
         id: v
         run: |
@@ -70,7 +72,7 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 > /dev/null 2>&1 || true
           mkdir -p $GITHUB_WORKSPACE/out/shots
-          SHOTS_DIR=$GITHUB_WORKSPACE/out/shots timeout 800 xvfb-run -a -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --resolution 1280x720 res://game/main.tscn -- --shots 2>&1 | grep -v "mesh_storage" | grep -E "PERF|SHOTS|ERROR|^shot " | tail -80 || true
+          SHOTS_DIR=$GITHUB_WORKSPACE/out/shots timeout 800 xvfb-run -a -s "-screen 0 1280x720x24" godot --resolution 1280x720 res://game/main.tscn -- --shots 2>&1 | grep -v "mesh_storage" | grep -E "PERF|SHOTS|ERROR|^shot " | tail -80 || true
           ls -la $GITHUB_WORKSPACE/out/shots
           cd $GITHUB_WORKSPACE/out/shots
           git init -q && git checkout -q -b capturas && git add . && git -c user.name=ci -c user.email=ci@golpe commit -qm "capturas ${GITHUB_SHA::7}"
@@ -80,12 +82,14 @@ jobs:
         run: |
           mkdir -p ../out
           godot --headless --export-debug "Android" ../out/golpe.apk 2>&1 | tee export.log
-          godot --headless --export-pack "Patch" ../out/game.pck 2>&1 | tee -a export.log
+          godot --headless --export-pack "Patch" ../out/game3.pck 2>&1 | tee -a export.log
           ls -la ../out
-          test -s ../out/golpe.apk && test -s ../out/game.pck
-          SZ=$(stat -c %s ../out/game.pck); SHA=$(sha256sum ../out/game.pck | cut -d' ' -f1); MIN=$(cat boot/min_app.txt 2>/dev/null || echo 0.0.0)
-          echo "{\"content\":\"${{ steps.v.outputs.cv }}\",\"app\":\"${{ steps.v.outputs.av }}\",\"min_app\":\"$MIN\",\"size\":$SZ,\"sha256\":\"$SHA\",\"date\":\"$(date -u +%F)\",\"commit\":\"${GITHUB_SHA::7}\"}" > ../out/version.json
-          cat ../out/version.json
+          test -s ../out/golpe.apk && test -s ../out/game3.pck
+          SZ=$(stat -c %s ../out/game3.pck); SHA=$(sha256sum ../out/game3.pck | cut -d' ' -f1); MIN=$(cat boot/min_app.txt 2>/dev/null || echo 0.0.0)
+          echo "{\"content\":\"${{ steps.v.outputs.cv }}\",\"app\":\"${{ steps.v.outputs.av }}\",\"min_app\":\"$MIN\",\"size\":$SZ,\"sha256\":\"$SHA\",\"date\":\"$(date -u +%F)\",\"commit\":\"${GITHUB_SHA::7}\"}" > ../out/version3.json
+          cat ../out/version3.json
+          # apps antigas (Godot 4.3) não podem carregar pacotes 4.7: ficam paradas e mostram "nova app"
+          echo "{\"content\":\"0.0.0\",\"app\":\"${{ steps.v.outputs.av }}\"}" > ../out/version.json
       - name: Publicar em Releases (latest)
         uses: softprops/action-gh-release@v2
         with:
@@ -96,6 +100,7 @@ jobs:
             Conteúdo ${{ steps.v.outputs.cv }} · app ${{ steps.v.outputs.av }}
           files: |
             out/golpe.apk
-            out/game.pck
+            out/game3.pck
+            out/version3.json
             out/version.json
           make_latest: true
