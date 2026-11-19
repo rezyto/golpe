@@ -219,6 +219,17 @@ func shots() -> void:
 	await tr.create_timer(0.3).timeout
 	await shot("05c_definicoes")
 	close_menu()
+	var cnt = {}
+	for mi in get_tree().root.find_children("*", "GeometryInstance3D", true, false):
+		var par = mi.get_parent()
+		var key = mi.get_class() + " <- " + (par.get_class() + ":" + str(par.name).left(14) if par else "?")
+		if mi is MeshInstance3D and mi.mesh:
+			key += " [" + mi.mesh.get_class() + "]"
+		cnt[key] = cnt.get(key, 0) + 1
+	var ks = cnt.keys()
+	ks.sort_custom(func(a, b): return cnt[a] > cnt[b])
+	for k in ks.slice(0, 14):
+		print("PERF top ", cnt[k], " ", k)
 	print("PERF cidade: draw calls ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), " objetos ", Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME), " nós ", Performance.get_monitor(Performance.OBJECT_NODE_COUNT), " fps ", Performance.get_monitor(Performance.TIME_FPS))
 	exit_car()
 	for vv in [[60.0, 100.0, 0.6], [150.0, 165.0, 2.4], [300.0, 100.0, -0.8], [205.0, 160.0, 1.57]]:
