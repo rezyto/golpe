@@ -21,9 +21,14 @@ jobs:
           tar -xf blender-4.2.3-linux-x64.tar.xz
           echo "$PWD/blender-4.2.3-linux-x64" >> $GITHUB_PATH
           sudo apt-get install -y -qq libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libxkbcommon0 libsm6 > /dev/null
+      - name: Cache dos pacotes MakeHuman
+        uses: actions/cache@v4
+        with:
+          path: ~/mhpacks
+          key: mhpacks-v1
       - name: MPFB2 + pacotes de recursos CC0
         run: |
-          python3 - <<'PY'
+          timeout 1500 python3 -u - <<'PY'
           import re, urllib.request
           UA={"User-Agent":"GOLPE/1.0"}
           def get(u): return urllib.request.urlopen(urllib.request.Request(u,headers=UA),timeout=120).read()
@@ -38,13 +43,17 @@ jobs:
           dest=os.path.expanduser("~/.config/blender/4.2/extensions/.user/user_default/mpfb/data")
           os.makedirs(dest, exist_ok=True)
           base="https://static.makehumancommunity.org/assets/assetpacks/"
-          for pk in ["makehuman_system_assets","skins01","skins02","hair01","eyebrows01","eyelashes01","pants01","shirts01","shoes01","suits01","suits02","hats01","hats02","masks01","glasses01","gloves01","equipment01"]:
+          for pk in ["makehuman_system_assets","shirts01","pants01","shoes01","hats01","masks01","suits01","hair01","skins01"]:
               try:
                   html=get(base+pk+".html").decode()
                   z=[l for l in re.findall(r'href="([^"]+\.zip)"',html)]
                   if not z: print("sem zip",pk); continue
                   u=z[0] if z[0].startswith("http") else base+z[0]
-                  data=get(u); zf=zipfile.ZipFile(io.BytesIO(data))
+                  cp=os.path.expanduser("~/mhpacks/"+pk+".zip"); os.makedirs(os.path.dirname(cp),exist_ok=True)
+                  if os.path.exists(cp): data=open(cp,"rb").read()
+                  else:
+                      print("a descarregar",pk,u,flush=True); data=get(u); open(cp,"wb").write(data)
+                  zf=zipfile.ZipFile(io.BytesIO(data))
                   names=zf.namelist(); print(pk, len(data)//1024, "KB", names[:3])
                   zf.extractall(dest)
               except Exception as e:
