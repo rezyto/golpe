@@ -39,26 +39,21 @@ jobs:
           url=[l for l in links if "download" in l or l.endswith(".zip")][0]
           if url.startswith("/"): url="https://extensions.blender.org"+url
           open("mpfb.zip","wb").write(get(url))
-          import zipfile, io, os
-          dest=os.path.expanduser("~/.config/blender/4.2/extensions/.user/user_default/mpfb/data")
-          os.makedirs(dest, exist_ok=True)
-          base="https://static.makehumancommunity.org/assets/assetpacks/"
-          for pk in ["makehuman_system_assets","shirts01","pants01","shoes01","hats01","masks01","suits01","hair01","skins01"]:
-              try:
-                  html=get(base+pk+".html").decode()
-                  z=[l for l in re.findall(r'href="([^"]+\.zip)"',html)]
-                  if not z: print("sem zip",pk); continue
-                  u=z[0] if z[0].startswith("http") else base+z[0]
-                  cp=os.path.expanduser("~/mhpacks/"+pk+".zip"); os.makedirs(os.path.dirname(cp),exist_ok=True)
-                  if os.path.exists(cp): data=open(cp,"rb").read()
-                  else:
-                      print("a descarregar",pk,u,flush=True); data=get(u); open(cp,"wb").write(data)
-                  zf=zipfile.ZipFile(io.BytesIO(data))
-                  names=zf.namelist(); print(pk, len(data)//1024, "KB", names[:3])
-                  zf.extractall(dest)
-              except Exception as e:
-                  print("falhou",pk,e)
           PY
+      - name: Recursos MakeHuman (CC0) a partir do GitHub
+        run: |
+          set -x
+          DEST=~/.config/blender/4.2/extensions/.user/user_default/mpfb/data
+          mkdir -p $DEST
+          GIT_LFS_SKIP_SMUDGE=1 git clone -q --depth 1 --filter=blob:none --sparse https://github.com/makehumancommunity/makehuman-assets.git mha
+          cd mha
+          git sparse-checkout set base/clothes base/skins base/eyes base/eyebrows base/eyelashes base/hair base/proxymeshes base/teeth base/tongue
+          git lfs install --local
+          timeout 1200 git lfs pull -I "base/**" || true
+          ls base; du -sh base/* || true
+          cp -r base/* $DEST/ || true
+          find $DEST -maxdepth 2 | head -40
+          cd $GITHUB_WORKSPACE
           blender -b --command extension install-file -r user_default -e mpfb.zip || true
           ls ~/.config/blender/4.2/extensions/user_default/ || true
       - name: Gerar personagens
