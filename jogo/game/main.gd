@@ -1208,6 +1208,7 @@ func make_car(col: String, pol: bool, model = "") -> Node3D:
 
 func make_simple_car(col: String, parent: Node3D, pos: Vector3, ang: float) -> Node3D:
 	var pcv = make_proc_car(CIV_SPECS[randi() % CIV_SPECS.size()], CIV_COLS[randi() % CIV_COLS.size()])
+	bake_static(pcv)
 	pcv.position = pos
 	pcv.rotation.y = -ang
 	parent.add_child(pcv)
@@ -1832,6 +1833,11 @@ func bake_static(root: Node3D) -> int:
 	var mats = {}
 	var shad = {}
 	var kill = []
+	var skip = {}
+	if root.has_meta("wheels"):
+		for w in root.get_meta("wheels"):
+			skip[w[0]] = true
+	_bake_skip = skip
 	_bake_collect(root, Transform3D.IDENTITY, groups, mats, shad, kill)
 	if kill.size() < 2:
 		return 0
@@ -1847,9 +1853,12 @@ func bake_static(root: Node3D) -> int:
 	return kill.size()
 
 
+var _bake_skip = {}
+
+
 func _bake_collect(node: Node, xf: Transform3D, groups: Dictionary, mats: Dictionary, shad: Dictionary, kill: Array) -> void:
 	for ch in node.get_children():
-		if not (ch is Node3D):
+		if not (ch is Node3D) or _bake_skip.has(ch):
 			continue
 		var cxf: Transform3D = xf * ch.transform
 		if ch is MeshInstance3D and ch.mesh != null and ch.visible:
@@ -2641,6 +2650,24 @@ func build_world() -> void:
 			box(Vector3(0.08, 1.2, 0.08), mat("#3a3a3a"), Vector3(p["x"] - 0.24, 0.85, wz2 - 0.1), world, false)
 		else:
 			rings.append(make_ring(Vector3(p["x"], 0.35, p["y"]), 1.2, 1.55, RED if p["kind"] == "heist" else GOLD))
+	bake_world_static()
+
+
+func bake_world_static() -> void:
+	## funde as peças soltas do mundo (passeios, passadeiras, portas, montras) por zonas
+	var keep = {}
+	for v in flags.values():
+		keep[v] = true
+	for v in Z.get("alarm_leds", {}).values():
+		keep[v] = true
+	for v in rings:
+		keep[v] = true
+	var root = Node3D.new()
+	world.add_child(root)
+	for ch in world.get_children():
+		if ch is MeshInstance3D and not keep.has(ch) and ch.get_child_count() == 0 and (ch.mesh is PrimitiveMesh or ch.mesh is ArrayMesh) and ch.visibility_range_end == 0.0:
+			ch.reparent(root, true)
+	bake_chunks(root, 60.0)
 
 
 func build_street_machine(p: Dictionary) -> void:
